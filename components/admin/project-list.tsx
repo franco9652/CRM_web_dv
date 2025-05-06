@@ -6,55 +6,33 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Building, ExternalLink } from "lucide-react"
 import { useRouter } from "next/navigation"
-
-// Mock project data
-const projects = [
-  {
-    id: 1,
-    name: "Torre Skyline",
-    client: "Inmobiliaria Vista",
-    startDate: "2023-01-15",
-    endDate: "2024-06-30",
-    budget: "$4.2M",
-    progress: 75,
-    status: "En Progreso",
-  },
-  {
-    id: 2,
-    name: "Complejo Riverside",
-    client: "Desarrollos Globales",
-    startDate: "2023-03-10",
-    endDate: "2024-09-15",
-    budget: "$3.8M",
-    progress: 45,
-    status: "En Progreso",
-  },
-  {
-    id: 3,
-    name: "Parque Oficinas Metro",
-    client: "Corporación Stark",
-    startDate: "2023-05-22",
-    endDate: "2024-04-10",
-    budget: "$2.5M",
-    progress: 90,
-    status: "En Progreso",
-  },
-  {
-    id: 4,
-    name: "Residencias Sunset",
-    client: "Inversiones Wayne",
-    startDate: "2022-11-05",
-    endDate: "2023-12-20",
-    budget: "$5.1M",
-    progress: 100,
-    status: "Completado",
-  },
-]
+import { useEffect, useState } from "react"
+import { getWorks, Work } from "@/services/works"
 
 export default function ProjectList() {
   const router = useRouter()
+  const [works, setWorks] = useState<Work[]>([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [error, setError] = useState<string|null>(null)
 
-  const formatDate = (dateString: string) => {
+  useEffect(() => {
+    setLoading(true)
+    getWorks(page)
+      .then((data) => {
+        setWorks(data.works)
+        setTotalPages(data.totalPages)
+        setLoading(false)
+      })
+      .catch((err) => {
+        setError("Error al cargar los trabajos")
+        setLoading(false)
+      })
+  }, [page])
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "-"
     const date = new Date(dateString)
     return new Intl.DateTimeFormat("es-ES", {
       year: "numeric",
@@ -63,7 +41,7 @@ export default function ProjectList() {
     }).format(date)
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status?: string) => {
     switch (status) {
       case "Planificación":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
@@ -81,68 +59,82 @@ export default function ProjectList() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Proyectos Activos</CardTitle>
-        <CardDescription>Resumen de todos los proyectos de construcción actuales.</CardDescription>
+        <CardTitle>Trabajos/Proyectos</CardTitle>
+        <CardDescription>Listado de todos los trabajos registrados en el sistema.</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre del Proyecto</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead className="hidden md:table-cell">Cronograma</TableHead>
-                <TableHead className="hidden md:table-cell">Presupuesto</TableHead>
-                <TableHead>Progreso</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {projects.map((project) => (
-                <TableRow key={project.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-2">
-                      <Building className="h-4 w-4 text-muted-foreground" />
-                      {project.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>{project.client}</TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    {formatDate(project.startDate)} - {formatDate(project.endDate)}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{project.budget}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Progress value={project.progress} className="h-2 w-[60px]" />
-                      <span className="text-xs">{project.progress}%</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(project.status)}`}
-                    >
-                      {project.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0"
-                      onClick={() => router.push(`/admin/projects/${project.id}`)}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                      <span className="sr-only">Ver proyecto</span>
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        {loading ? (
+          <div className="text-center py-8">Cargando trabajos...</div>
+        ) : error ? (
+          <div className="text-center text-red-500 py-8">{error}</div>
+        ) : (
+          <>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N°</TableHead>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead className="hidden md:table-cell">Inicio</TableHead>
+                    <TableHead className="hidden md:table-cell">Fin</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="hidden md:table-cell">Dirección</TableHead>
+                    <TableHead className="hidden md:table-cell">Tipo</TableHead>
+                    <TableHead className="hidden md:table-cell">Presupuesto</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {works.map((work) => (
+                    <TableRow key={work._id}>
+                      <TableCell>{work.number || '-'}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-muted-foreground" />
+                          {work.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>{work.customerName || '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{formatDate(work.startDate)}</TableCell>
+                      <TableCell className="hidden md:table-cell">{formatDate(work.endDate)}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(work.statusWork)}`}>
+                          {work.statusWork || '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">{work.address || '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{work.projectType || '-'}</TableCell>
+                      <TableCell className="hidden md:table-cell">{typeof work.budget === 'number' ? `$${work.budget.toLocaleString()}` : '-'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 w-8 p-0"
+                          onClick={() => router.push(`/admin/projects/${work._id}`)}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          <span className="sr-only">Ver trabajo</span>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            {/* Paginación */}
+            <div className="flex justify-center mt-4 gap-2">
+              <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(page-1)}>
+                Anterior
+              </Button>
+              <span className="px-2 py-1 text-sm">Página {page} de {totalPages}</span>
+              <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage(page+1)}>
+                Siguiente
+              </Button>
+            </div>
+          </>
+        )}
       </CardContent>
     </Card>
   )
 }
-

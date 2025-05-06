@@ -70,12 +70,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Guardar el token
       localStorage.setItem("token", response.token)
 
-      // Crear objeto de usuario basado en la respuesta
+      // Crear objeto de usuario basado en la respuesta REAL del backend
       const userData: User = {
-        id: response.user?.id || "default-id",
+        id: response.userId || response.user?.id || "default-id",
         name: response.user?.name || email,
         email: email,
-        role: email.includes("admin") ? "admin" : "client",
+        role: response.role || response.user?.role || (email.includes("admin") ? "admin" : "client"),
+        // Puedes mapear otros campos si los necesitas
       }
 
       // Guardar datos del usuario
@@ -85,9 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true
     } catch (error) {
       console.error("Error en login:", error)
-      // Si el error es un Error object, usar su mensaje
       const errorMessage = error instanceof Error ? error.message : "Error desconocido al iniciar sesión"
-      // Propagar el error para que la UI pueda mostrarlo
       throw new Error(errorMessage)
     } finally {
       setIsLoading(false)

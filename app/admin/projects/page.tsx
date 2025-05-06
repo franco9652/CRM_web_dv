@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,59 +17,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Building, Calendar, ClipboardList, MoreHorizontal, Plus, Search } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
+import { getWorks, Work } from "@/services/works"
 
-// Datos de proyectos de ejemplo
-const initialProjects = [
-  {
-    id: 1,
-    name: "Torre Skyline",
-    client: "Inmobiliaria Vista",
-    startDate: "2023-01-15",
-    endDate: "2024-06-30",
-    budget: "$4.2M",
-    progress: 75,
-    status: "En Progreso",
-  },
-  {
-    id: 2,
-    name: "Complejo Riverside",
-    client: "Desarrollos Globales",
-    startDate: "2023-03-10",
-    endDate: "2024-09-15",
-    budget: "$3.8M",
-    progress: 45,
-    status: "En Progreso",
-  },
-  {
-    id: 3,
-    name: "Parque Oficinas Metro",
-    client: "Corporación Stark",
-    startDate: "2023-05-22",
-    endDate: "2024-04-10",
-    budget: "$2.5M",
-    progress: 90,
-    status: "En Progreso",
-  },
-  {
-    id: 4,
-    name: "Residencias Sunset",
-    client: "Inversiones Wayne",
-    startDate: "2022-11-05",
-    endDate: "2023-12-20",
-    budget: "$5.1M",
-    progress: 100,
-    status: "Completado",
-  },
-  {
-    id: 5,
-    name: "Hotel Vista al Puerto",
-    client: "Oscorp",
-    startDate: "2024-02-15",
-    endDate: "2025-08-30",
-    budget: "$7.3M",
-    progress: 0,
-    status: "Planificación",
-  },
+// Estados de los proyectos
+const projectStatus = [
+  { value: "Todos", label: "Todos los Estados" },
+  { value: "Planificación", label: "Planificación" },
+  { value: "En Progreso", label: "En Progreso" },
+  { value: "En Pausa", label: "En Pausa" },
+  { value: "Completado", label: "Completado" },
 ]
 
 export default function ProjectsPage() {
@@ -82,12 +38,31 @@ export default function ProjectsPage() {
     date: "",
     description: "",
   })
+  const [projects, setProjects] = useState<Work[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
 
-  const filteredProjects = initialProjects.filter(
+  useEffect(() => {
+    setLoading(true)
+    getWorks(page)
+      .then((data) => {
+        setProjects(data.works)
+        setTotalPages(data.totalPages)
+        setLoading(false)
+      })
+      .catch((err) => {
+        setError("Error al cargar los trabajos")
+        setLoading(false)
+      })
+  }, [page])
+
+  const filteredProjects = projects.filter(
     (project) =>
       (project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        project.client.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (statusFilter === "Todos" || project.status === statusFilter),
+        (project.customerName || "").toLowerCase().includes(searchTerm.toLowerCase())) &&
+      (statusFilter === "Todos" || project.statusWork === statusFilter),
   )
 
   const formatDate = (dateString) => {
@@ -157,111 +132,116 @@ export default function ProjectsPage() {
                 <SelectValue placeholder="Filtrar por estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Todos">Todos los Estados</SelectItem>
-                <SelectItem value="Planificación">Planificación</SelectItem>
-                <SelectItem value="En Progreso">En Progreso</SelectItem>
-                <SelectItem value="En Pausa">En Pausa</SelectItem>
-                <SelectItem value="Completado">Completado</SelectItem>
+                {projectStatus.map((status) => (
+                  <SelectItem key={status.value} value={status.value}>
+                    {status.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre del Proyecto</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead className="hidden md:table-cell">Cronograma</TableHead>
-                  <TableHead className="hidden md:table-cell">Presupuesto</TableHead>
-                  <TableHead>Progreso</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredProjects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        {project.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>{project.client}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        <span>{formatDate(project.startDate)}</span>
-                        <span className="mx-1">-</span>
-                        <span>{formatDate(project.endDate)}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{project.budget}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress value={project.progress} className="h-2 w-[60px]" />
-                        <span className="text-xs">{project.progress}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(project.status)}`}
-                      >
-                        {project.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Abrir menú</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => navigateToProjectDetails(project.id)}>
-                            Ver Detalles
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project.id}/edit`)}>
-                            Editar Proyecto
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => navigateToAddMilestone(project.id)}>
-                            <ClipboardList className="mr-2 h-4 w-4" />
-                            Agregar Hito
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project.id}/milestones`)}>
-                            Ver Hitos
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project.id}/budget`)}>
-                            Gestionar Presupuesto
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project.id}/documents`)}>
-                            Ver Documentos
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project.id}/schedule`)}>
-                            Programar Reunión
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredProjects.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                      No se encontraron proyectos. Intenta ajustar tu búsqueda o crear un nuevo proyecto.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          {loading ? (
+            <div className="text-center py-8">Cargando trabajos...</div>
+          ) : error ? (
+            <div className="text-center text-red-500 py-8">{error}</div>
+          ) : (
+            <>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nombre del Proyecto</TableHead>
+                      <TableHead>Cliente</TableHead>
+                      <TableHead>Cronograma</TableHead>
+                      <TableHead>Presupuesto</TableHead>
+                      <TableHead>Progreso</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredProjects.map((project) => (
+                      <TableRow key={project._id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Building className="h-4 w-4 text-muted-foreground" />
+                            {project.name}
+                          </div>
+                        </TableCell>
+                        <TableCell>{project.customerName || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            <span>{formatDate(project.startDate)}</span>
+                            <span className="mx-1">-</span>
+                            <span>{formatDate(project.endDate)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{typeof project.budget === 'number' ? `$${project.budget.toLocaleString()}` : '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={project.progress || 0} className="h-2 w-[60px]" />
+                            <span className="text-xs">{project.progress || 0}%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(project.statusWork)}`}>
+                            {project.statusWork || '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Abrir menú</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => navigateToProjectDetails(project._id)}>
+                                Ver Detalles
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project._id}/edit`)}>
+                                Editar Proyecto
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => navigateToAddMilestone(project._id)}>
+                                <ClipboardList className="mr-2 h-4 w-4" />
+                                Agregar Hito
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project._id}/milestones`)}>
+                                Ver Hitos
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project._id}/budget`)}>
+                                Gestionar Presupuesto
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project._id}/documents`)}>
+                                Ver Documentos
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project._id}/schedule`)}>
+                                Programar Reunión
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {filteredProjects.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                          No se encontraron proyectos. Intenta ajustar tu búsqueda o crear un nuevo proyecto.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
   )
 }
-
