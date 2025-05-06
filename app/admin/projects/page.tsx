@@ -65,7 +65,7 @@ export default function ProjectsPage() {
       (statusFilter === "Todos" || project.statusWork === statusFilter),
   )
 
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     return new Intl.DateTimeFormat("es-ES", {
       year: "numeric",
@@ -74,7 +74,7 @@ export default function ProjectsPage() {
     }).format(date)
   }
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status?: string) => {
     switch (status) {
       case "Planificación":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
@@ -89,11 +89,11 @@ export default function ProjectsPage() {
     }
   }
 
-  const navigateToProjectDetails = (projectId) => {
+  const navigateToProjectDetails = (projectId: string) => {
     router.push(`/admin/projects/${projectId}`)
   }
 
-  const navigateToAddMilestone = (projectId) => {
+  const navigateToAddMilestone = (projectId: string) => {
     router.push(`/admin/projects/${projectId}/milestones`)
   }
 
@@ -172,9 +172,9 @@ export default function ProjectsPage() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3 text-muted-foreground" />
-                            <span>{formatDate(project.startDate)}</span>
+                            <span>{formatDate(project.startDate ?? "")}</span>
                             <span className="mx-1">-</span>
-                            <span>{formatDate(project.endDate)}</span>
+                            <span>{formatDate(project.endDate ?? "")}</span>
                           </div>
                         </TableCell>
                         <TableCell>{typeof project.budget === 'number' ? `$${project.budget.toLocaleString()}` : '-'}</TableCell>

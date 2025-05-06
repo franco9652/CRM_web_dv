@@ -35,15 +35,16 @@ export async function getWorks(page = 1): Promise<WorksResponse> {
       totalPages: 1,
       works: res.data
     }
-  } else if (res.data && res.data.works) {
+  } else if (res.data && typeof res.data === 'object' && 'works' in res.data) {
     // Respuesta esperada
     return res.data as WorksResponse;
   } else {
     // Respuesta inesperada, intento adaptarla
+    const data: any = res.data || {};
     return {
-      page: res.data?.page || 1,
-      totalPages: res.data?.totalPages || 1,
-      works: res.data?.works || res.data?.result || []
+      page: typeof data.page === 'number' ? data.page : 1,
+      totalPages: typeof data.totalPages === 'number' ? data.totalPages : 1,
+      works: Array.isArray(data.works) ? data.works : (Array.isArray(data.result) ? data.result : [])
     }
   }
 }
