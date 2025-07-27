@@ -10,7 +10,7 @@ type User = {
   id: string
   name: string
   email: string
-  role: "admin" | "client"
+  role: "admin" | "client" | "customer" | "employee"
   department?: string
   position?: string
   contactName?: string
@@ -72,10 +72,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Crear objeto de usuario basado en la respuesta REAL del backend
       const userData: User = {
-        id: response.userId || response.user?.id || "default-id",
+        id: response.user?.id || "default-id",
         name: response.user?.name || email,
         email: email,
-        role: response.role || response.user?.role || (email.includes("admin") ? "admin" : "client"),
+        role: response.user?.role || (email.includes("admin") ? "admin" : "client"),
         // Puedes mapear otros campos si los necesitas
       }
 
