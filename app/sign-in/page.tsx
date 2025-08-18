@@ -30,7 +30,7 @@ export default function SignIn() {
       if (email.includes("admin")) {
         router.push("/admin/dashboard")
       } else {
-        router.push("/client/dashboard")
+        router.push("/client/projects")
       }
     } catch (error) {
       console.error("Error al iniciar sesión:", error)

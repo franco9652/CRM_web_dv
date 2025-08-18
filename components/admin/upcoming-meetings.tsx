@@ -5,6 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Calendar, Clock, Users, Video } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useAuth } from "../auth-provider"
+import { getMeetingsByUsername } from "@/services/meetings"
+import { useEffect } from "react"
 
 // Datos de reuniones de ejemplo
 const meetings = [
@@ -59,6 +62,7 @@ const meetings = [
 
 export default function UpcomingMeetings() {
   const router = useRouter()
+  const { user } = useAuth()
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -68,6 +72,22 @@ export default function UpcomingMeetings() {
       day: "numeric",
     }).format(date)
   }
+
+  const fetchMeetings = async () => {
+    if (!user?.role) {
+      return
+    }
+    try {
+      const response = await getMeetingsByUsername(user.email)  
+      return response
+    } catch (error) {
+      console.error("Error al obtener las reuniones:", error)
+    }
+  }
+
+  useEffect(() => {
+    fetchMeetings()
+  }, [user])
 
   return (
     <Card>

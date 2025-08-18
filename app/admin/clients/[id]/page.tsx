@@ -4,43 +4,17 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronLeft, FileText, Users, Loader2 } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { getWorkById, Work } from "@/services/works"
+import { ChevronLeft, Loader2, User, Mail, Phone, MapPin, IdCard, MapPinned, FileText,  } from "lucide-react"
+import { getCustomersByUserId, Customer } from "@/services/customers"
+import { Tabs, TabsList, TabsTrigger } from "@radix-ui/react-tabs"
 
-export default function ProjectDetailsPage() {
+export default function ClientDetailsPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
-  const [project, setProject] = useState<Work | null>(null)
-  const [activeTab, setActiveTab] = useState("documents")
+  const [client, setClient] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const getWorkData = async () => {
-    setLoading(true)
-    getWorkById(params.id)
-      .then((data) => {
-        setProject(data?.work)
-        setLoading(false)
-      })
-      .catch(() => {
-        setError("Error al cargar el proyecto")
-        setLoading(false)
-      })
-  }
-
-  useEffect(() => {
-    getWorkData()
-  }, [params.id])
+  const [activeTab, setActiveTab] = useState("documents")
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString || dateString.trim() === '') {
@@ -59,40 +33,53 @@ export default function ProjectDetailsPage() {
     }
   }
 
-    // Procesar coordenadas para el enlace de Google Maps
-    let googleMapsUrl = null;
-    if (project?.workUbication) {
-      const parts = project.workUbication.split(', ');
-      if (parts.length === 2) {
-        const lat = parseFloat(parts[0]);
-        const lng = parseFloat(parts[1]);
-        if (!isNaN(lat) && !isNaN(lng)) {
-          googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-        }
-      }
+  useEffect(() => {
+    if (params.id) {
+      setLoading(true)
+      getCustomersByUserId(params.id)
+        .then((response) => {
+          const currentClient = response.customer && response.customer.length > 0 ? response.customer[0] : null;
+          if (currentClient) {
+            setClient(currentClient)
+          } else {
+            setError("Cliente no encontrado")
+          }
+          setLoading(false)
+        })
+        .catch(() => {
+          setError("Error al cargar el cliente")
+          setLoading(false)
+        })
     }
+  }, [params.id])
 
-  if (loading && !error) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-[50vh]">
-          <div className="text-center py-8 flex justify-center items-center p-6">
+        <div className="text-center py-8 flex justify-center items-center p-6">
           <Loader2 className="animate-spin text-primary" size={24} />
-          <p className="px-6">Cargando proyectos...</p>          
+          <p className="px-6">Cargando cliente...</p>
         </div>
       </div>
     )
-  } else if (error) {
+  }
+
+  if (error) {
     return (
       <div className="flex items-center justify-center h-[50vh]">
         <div className="text-center">
-          <h2 className="text-xl font-semibold">Error al cargar el proyecto</h2>
-          <Button className="mt-4" onClick={() => router.push("/admin/projects")}>
+          <h2 className="text-xl font-semibold">{error}</h2>
+          <Button className="mt-4" onClick={() => router.push("/admin/clients")}>
             <ChevronLeft className="mr-2 h-4 w-4" />
-            Volver a Proyectos
+            Volver a Clientes
           </Button>
         </div>
       </div>
     )
+  }
+
+  if (!client) {
+    return null
   }
 
   function downloadDocument(document: any): void {
@@ -109,84 +96,70 @@ export default function ProjectDetailsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => router.push("/admin/projects")}>
+          <Button variant="outline" size="sm" onClick={() => router.push("/admin/clients")}>
             <ChevronLeft className="mr-1 h-4 w-4" />
             Volver
           </Button>
-          <h1 className="text-2xl font-bold">{project?.name}</h1>
-          <span
-            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
-            ${
-              project?.statusWork === "activo"
-                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-                : project?.statusWork === "En progreso"
-                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
-                  : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-            }`}
-          >
-            {project?.statusWork  }
-          </span>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Información del Proyecto</CardTitle>
-          <CardDescription>Detalles generales y estado actual del proyecto</CardDescription>
+          <CardTitle>Información del Cliente</CardTitle>
+          <span
+            className={` w-24 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
+            ${
+              client?.active === true
+                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+                : client?.active === false
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
+                  : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+            }`}
+          >
+            {client?.active === true ? "Activo" : "Inactivo"}
+          </span>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium mb-2">Tipo de proyecto</h3>
-              <p className="text-muted-foreground">{project?.projectType}</p>
+          <div className="space-y-4">
+            <div className="flex items-center">
+              <User className="h-5 w-5 text-muted-foreground mr-3" />
+              <span>{'Nombre: ' + client.name}</span>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="text-sm font-medium mb-2">Detalles del Proyecto</h3>
-                <dl className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Cliente:</dt>
-                    <dd>{project?.customerName}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Ubicación:</dt>
-                    {
-                    googleMapsUrl ? (
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{project?.workUbication}</span>
-                        <a 
-                          href={googleMapsUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="font-semibold text-primary hover:underline"
-                          >
-                        Ver en mapa 📍
-                      </a>
-                    </div>                
-                    ) : (
-                      <span className="font-semibold">{project?.address || 'No disponible'}</span>
-                    )}
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Fecha de inicio:</dt>
-                    <dd>{formatDate(project?.startDate)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Fecha de finalización:</dt>
-                    <dd>{formatDate(project?.endDate)}</dd>
-                  </div>
-                  <div className="flex justify-between">
-                    <dt className="text-muted-foreground">Presupuesto:</dt>
-                    <dd>{project?.budget}</dd>
-                  </div>
-                </dl>
+            <div className="flex items-center">
+              <Mail className="h-5 w-5 text-muted-foreground mr-3" />
+              <span>{'Email: ' + client.email}</span>
+            </div>
+            {client.phone && (
+              <div className="flex items-center">
+                <Phone className="h-5 w-5 text-muted-foreground mr-3" />
+                <span>{'Telefono: ' + client.phone}</span>
               </div>
+            )}
+            {client.address && (
+              <div className="flex items-center">
+                <MapPin className="h-5 w-5 text-muted-foreground mr-3" />
+                <span>{'Direccion: ' + client.address}</span>
+              </div>
+            )}
+            <div className="flex items-center">
+              <Phone className="h-5 w-5 text-muted-foreground mr-3" />
+              <span>{'Contacto: ' + client.contactNumber}</span>
+            </div>
+            <div className="flex items-center">
+              <IdCard className="h-5 w-5 text-muted-foreground mr-3" />
+              <span>{'DNI: ' + client.dni}</span>
+            </div>
+            <div className="flex items-center">
+              <IdCard className="h-5 w-5 text-muted-foreground mr-3" />
+              <span>{'CUIT: ' + client.cuit}</span>
+            </div>
+            <div className="flex items-center">
+              <MapPinned className="h-5 w-5 text-muted-foreground mr-3" />
+              <span>{'Direccion de Trabajo: ' + client.workDirection}</span>
             </div>
           </div>
         </CardContent>
       </Card>
-
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           {/* <TabsTrigger value="team">Equipo</TabsTrigger> */}
@@ -221,16 +194,16 @@ export default function ProjectDetailsPage() {
         {activeTab === "documents" && (
           <Card className="mt-4">
             <CardHeader>
-              <CardTitle>Documentos del Proyecto</CardTitle>
-              <CardDescription>Archivos y documentación relacionada con el proyecto</CardDescription>
+              <CardTitle>Documentos</CardTitle>
+              <CardDescription>Archivos y documentación relacionados</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {
-                  project?.documents?.length === 0 ? (
-                    <p>No hay documentos disponibles para este proyecto.</p>
+                  client?.documents?.length === 0 ? (
+                    <p>No hay documentos disponibles para este cliente.</p>
                   ) : (
-                  project?.documents?.map((document: any) => (
+                  client?.documents?.map((document: any) => (
                     <div key={document._id} className="flex items-start gap-4 p-4 border rounded-md">
                       <div className="bg-primary/10 p-2 rounded-full">
                         <FileText className="h-4 w-4 text-primary" />
@@ -257,4 +230,3 @@ export default function ProjectDetailsPage() {
     </div>
   )
 }
-

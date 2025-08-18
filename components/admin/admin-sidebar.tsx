@@ -94,19 +94,6 @@ export default function AdminSidebar() {
             </Link>
           </nav>
         </div>
-        <div className="mt-auto border-t p-4">
-          <Link
-            href="/admin/settings"
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
-              isActive("/admin/settings")
-                ? "bg-muted text-primary"
-                : "text-muted-foreground hover:bg-muted hover:text-primary"
-            }`}
-          >
-            <Settings className="h-4 w-4" />
-            {!collapsed && <span>Configuración</span>}
-          </Link>
-        </div>
       </div>
     </div>
   )

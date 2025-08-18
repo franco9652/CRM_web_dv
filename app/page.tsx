@@ -15,7 +15,7 @@ export default function Home() {
         if (user.role === "admin") {
           router.push("/admin/dashboard")
         } else {
-          router.push("/client/dashboard")
+          router.push("/client/projects")
         }
       } else {
         router.push("/sign-in")

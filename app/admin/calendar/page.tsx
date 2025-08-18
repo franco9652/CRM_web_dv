@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -26,6 +26,8 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar, Clock, Edit, Link, MapPin, MoreHorizontal, Plus, Search, Trash, Users, Video } from "lucide-react"
+import { getMeetingsByUsername } from "@/services/meetings"
+import { useAuth } from "@/components/auth-provider"
 
 // Datos de reuniones de ejemplo
 const initialMeetings = [
@@ -129,6 +131,7 @@ const clients = [
 // ]
 
 export default function CalendarPage() {
+  const { user } = useAuth()
   const [meetings, setMeetings] = useState(initialMeetings)
   const [searchTerm, setSearchTerm] = useState("")
   const [projectFilter, setProjectFilter] = useState("Todos")
@@ -157,6 +160,7 @@ export default function CalendarPage() {
 
   // Agregar estado para los proyectos disponibles basados en el cliente seleccionado
   const [availableProjects, setAvailableProjects] = useState<string[]>([])
+  
 
   // Actualizar la función de filtrado para que filtre por cliente en lugar de proyecto
   const filteredMeetings = meetings.filter(
@@ -299,6 +303,19 @@ export default function CalendarPage() {
     setSelectedMeeting(meeting)
     setIsDeleteDialogOpen(true)
   }
+
+  useEffect(() => {
+    const fetchMeetings = async () => {
+      try {
+        console.log('user: ', user)
+        const response = await getMeetingsByUsername(user?.name || "")
+        setMeetings(response.meetings)
+      } catch (error) {
+        console.error("Error fetching meetings:", error)
+      }
+    }
+    fetchMeetings()
+  }, [])
 
   return (
     <div className="space-y-6">

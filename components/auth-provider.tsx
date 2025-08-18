@@ -10,7 +10,8 @@ type User = {
   id: string
   name: string
   email: string
-  role: "admin" | "client" | "customer" | "employee"
+  // role: "admin" | "client" | "customer" | "employee"
+  role: string
   department?: string
   position?: string
   contactName?: string
@@ -69,14 +70,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Guardar el token
       localStorage.setItem("token", response.token)
+      console.log('ACA LOS DATOS DEL RESPONSE LOGIN:\n', response)
 
-      // Crear objeto de usuario basado en la respuesta REAL del backend
       const userData: User = {
-        id: response.user?.id || "default-id",
+        id: response.userId,
         name: response.user?.name || email,
-        email: email,
-        role: response.user?.role || (email.includes("admin") ? "admin" : "client"),
-        // Puedes mapear otros campos si los necesitas
+        email: response.user?.email || email,
+        role: response.user?.role || response.role,
       }
 
       // Guardar datos del usuario

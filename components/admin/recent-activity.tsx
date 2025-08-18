@@ -1,131 +1,139 @@
-"use client"
+import { useState, useEffect } from 'react';
+import { Employee, getAllEmployees, getEmployees } from '@/services/employees';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Building, Calendar, FileText, MessageSquare, User, Users } from "lucide-react"
+function EmployeesList() {
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-// Datos de actividad de ejemplo
-const activities = [
-  {
-    id: 1,
-    type: "document",
-    description: "Propuesta de presupuesto para Torre Skyline fue aprobada",
-    user: "Juan Pérez",
-    time: "hace 2 horas",
-    project: "Torre Skyline",
-  },
-  {
-    id: 2,
-    type: "meeting",
-    description: "Reunión de revisión de diseño programada con Desarrollos Globales",
-    user: "Sara Jiménez",
-    time: "hace 4 horas",
-    project: "Complejo Riverside",
-  },
-  {
-    id: 3,
-    type: "comment",
-    description: "Nuevo comentario sobre el cronograma del Parque Oficinas Metro",
-    user: "Miguel Moreno",
-    time: "Ayer a las 3:45 PM",
-    project: "Parque Oficinas Metro",
-  },
-  {
-    id: 4,
-    type: "client",
-    description: "Nueva cuenta de cliente creada para Oscorp",
-    user: "Elena Díaz",
-    time: "Ayer a las 11:30 AM",
-    project: null,
-  },
-  {
-    id: 5,
-    type: "project",
-    description: "Proyecto Hotel Vista al Puerto creado",
-    user: "Roberto Wilson",
-    time: "hace 2 días",
-    project: "Hotel Vista al Puerto",
-  },
-  {
-    id: 6,
-    type: "document",
-    description: "Nuevos planos subidos para Residencias Sunset",
-    user: "Jennifer López",
-    time: "hace 2 días",
-    project: "Residencias Sunset",
-  },
-]
-
-export default function RecentActivity() {
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "document":
-        return <FileText className="h-4 w-4" />
-      case "meeting":
-        return <Calendar className="h-4 w-4" />
-      case "comment":
-        return <MessageSquare className="h-4 w-4" />
-      case "client":
-        return <Users className="h-4 w-4" />
-      case "project":
-        return <Building className="h-4 w-4" />
-      default:
-        return <FileText className="h-4 w-4" />
+  const fetchEmployees = async (page: number) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await getEmployees(page);
+      setEmployees(data.employees);
+      setTotalPages(data.totalPages);
+      setCurrentPage(data.page);
+    } catch (err) {
+      console.error('Error:', err);
+      setError(err instanceof Error ? err.message : 'Error al cargar los empleados');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    fetchEmployees(currentPage);
+  }, []);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      fetchEmployees(newPage);
+    }
+  };
+
+  if (loading && employees.length === 0) {
+    return <div className="p-4">Cargando empleados...</div>;
   }
 
-  const getActivityColor = (type: string) => {
-    switch (type) {
-      case "document":
-        return "bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-300"
-      case "meeting":
-        return "bg-purple-100 text-purple-600 dark:bg-purple-900 dark:text-purple-300"
-      case "comment":
-        return "bg-amber-100 text-amber-600 dark:bg-amber-900 dark:text-amber-300"
-      case "client":
-        return "bg-green-100 text-green-600 dark:bg-green-900 dark:text-green-300"
-      case "project":
-        return "bg-red-100 text-red-600 dark:bg-red-900 dark:text-red-300"
-      default:
-        return "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-    }
+  if (error) {
+    return (
+      <div className="p-4 bg-red-50 text-red-700 rounded-md">
+        <p>Error: {error}</p>
+        <button 
+          onClick={() => fetchEmployees(currentPage)}
+          className="mt-2 px-4 py-2 bg-red-100 hover:bg-red-200 rounded"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Actividad Reciente</CardTitle>
-        <CardDescription>Últimas acciones y actualizaciones en todos los proyectos.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-8">
-          {activities.map((activity) => (
-            <div key={activity.id} className="flex">
-              <div
-                className={`mr-4 flex h-10 w-10 items-center justify-center rounded-full ${getActivityColor(activity.type)}`}
-              >
-                {getActivityIcon(activity.type)}
-              </div>
-              <div className="flex-1 space-y-1">
-                <p className="text-sm font-medium leading-none">{activity.description}</p>
-                <div className="flex items-center pt-2 text-xs text-muted-foreground">
-                  <User className="mr-1 h-3 w-3" />
-                  <span>{activity.user}</span>
-                  <span className="px-2">•</span>
-                  <span>{activity.time}</span>
-                  {activity.project && (
-                    <>
-                      <span className="px-2">•</span>
-                      <Building className="mr-1 h-3 w-3" />
-                      <span>{activity.project}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-6">Lista de Empleados</h1>
+      
+      <div className="overflow-x-auto">
+        <table className="min-w-full bg-white rounded-lg overflow-hidden">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Nombre
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Apellido
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Email
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Estado
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {employees?.map((employee) => (
+              <tr key={employee._id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="font-medium text-gray-900">{employee.name}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                  {employee.lastName || 'No especificado'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-500">
+                  {employee.email || 'No especificado'}
+                </td>
+
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    employee.active
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {employee.active ? 'Activo' : 'Inactivo'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex justify-between items-center">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className={`px-4 py-2 rounded ${currentPage === 1 
+              ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+              : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+          >
+            Anterior
+          </button>
+          
+          <span className="text-sm text-gray-700">
+            Página {currentPage} de {totalPages}
+          </span>
+          
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className={`px-4 py-2 rounded ${currentPage === totalPages 
+              ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
+              : 'bg-blue-500 text-white hover:bg-blue-600'}`}
+          >
+            Siguiente
+          </button>
         </div>
-      </CardContent>
-    </Card>
-  )
+      )}
+    </div>
+  );
 }
+
+export default EmployeesList;
 

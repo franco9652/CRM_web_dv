@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -20,6 +20,10 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { useAuth } from "@/components/auth-provider"
+import { getWorks, getWorksByCustomerId, Work } from "@/services/works"
+import { useToast } from "@/hooks/use-toast"
+import { Customer, getCustomersByUserId } from "@/services/customers"
 
 // Datos de documentos de ejemplo
 const documents = [
@@ -96,11 +100,73 @@ const availableCategories = [
 ]
 
 export default function ClientDocumentsPage() {
+  const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
+  const { user } = useAuth()
+  const [works, setWorks] = useState<Work[]>([])
+  const [worksError, setWorksError] = useState("")
+  const [loadingWorks, setLoadingWorks] = useState(true)
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [loadingCustomers, setLoadingCustomers] = useState(true)
+  const [customersError, setCustomersError] = useState("")
   const [projectFilter, setProjectFilter] = useState("Todos")
   const [categoryFilter, setCategoryFilter] = useState("Todas")
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [documentsList, setDocumentsList] = useState(documents)
+
+    const fetchWorks = async () => {
+      if (!user?.role) {
+        setWorksError("No se encontró el rol del usuario actual")
+        return
+      }
+      setLoadingWorks(true)
+      setWorksError("")
+      try {
+        let data: any = []
+        if (user.role === "admin") {
+          // Obtener todos los proyectos para admin
+          const response = await getWorks(1)
+          data = response.works
+        } else if (user.role === "client" || user.role === "customer" || user.role === "employee") {
+          // Obtener solo los proyectos del cliente o empleado
+          if (!user.id) throw new Error("ID de cliente no válido")
+          const worksResult = await getWorksByCustomerId("678ac8bbcaa29603b2663cba")
+          // const worksResult = await getWorksByCustomerId(user.id)
+          data = worksResult as Work[]
+        } else {
+          throw new Error("Rol de usuario no soportado")
+        }
+        setWorks(data.works)
+      } catch (err: any) {
+        if(err?.status === 400){
+          setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
+        } else if (err?.status === 404){
+          setWorksError("No se encontraron proyectos")
+        } else {
+          setWorksError("Error al cargar los proyectos")
+        }
+        toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
+      } finally {
+        setLoadingWorks(false)
+      }
+    }
+  
+    async function fetchData() {
+      if (!user?.id) return
+      try {
+        const data = await getCustomersByUserId(user.id);
+        setCustomers(data);
+      } catch (err: any) {
+        setCustomersError(err.message ?? "Error al obtener customers");
+      } finally {
+        setLoadingCustomers(false);
+      }
+    }
+  
+    useEffect(() => {
+      fetchWorks()
+      fetchData()
+    }, [user?.id, user?.role])
 
   const [newDocument, setNewDocument] = useState({
     name: "",

@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building, Calendar, CheckCircle2, ChevronDown, ChevronUp, ExternalLink, Search } from "lucide-react"
+import { Building, Calendar, ChevronDown, ChevronUp, ExternalLink, Loader2, Search } from "lucide-react"
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible"
 import { getWorks, getWorksByCustomerId } from "@/services/works"
 import type { Work } from "@/services/works"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/components/ui/use-toast"
+import { Customer, getCustomersByUserId } from "@/services/customers"
 
 // Define el tipo Milestone localmente
 interface Milestone {
@@ -23,64 +24,98 @@ interface Milestone {
 export default function ClientProjectsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [works, setWorks] = useState<Work[]>([])
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const [loadingWorks, setLoadingWorks] = useState(true)
+  const [worksError, setWorksError] = useState("")
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("Todos")
-  const [expandedProjects, setExpandedProjects] = useState<number[]>([])
+  const [expandedProjects, setExpandedProjects] = useState<string[]>([])
+  const [loadingCustomers, setLoadingCustomers] = useState(true)
+  const [customersError, setCustomersError] = useState("")
+  // console.log('loading customers:', loadingCustomers)
+  // console.log('customersError: ', customersError)
 
   const fetchWorks = async () => {
     if (!user?.role) {
-      setError("No se encontró el rol del usuario actual")
+      setWorksError("No se encontró el rol del usuario actual")
       return
     }
-    setLoading(true)
-    setError("")
+    setLoadingWorks(true)
+    setWorksError("")
     try {
-      let data: Work[] = []
+      let data: any = []
       if (user.role === "admin") {
         // Obtener todos los proyectos para admin
-        const response = await getWorks(1)
+        const response = await getWorks()
         data = response.works
       } else if (user.role === "client" || user.role === "customer" || user.role === "employee") {
         // Obtener solo los proyectos del cliente o empleado
         if (!user.id) throw new Error("ID de cliente no válido")
-        const worksResult = await getWorksByCustomerId(user.id)
+        // const worksResult = await getWorksByCustomerId(user.id)
+        const worksResult = await getWorksByCustomerId("678ac8bbcaa29603b2663cba")
         data = worksResult as Work[]
       } else {
         throw new Error("Rol de usuario no soportado")
       }
-      setWorks(data)
+      setWorks(data.works)
     } catch (err: any) {
-      setError("Error al cargar los trabajos")
+      if(err?.status === 400){
+        setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
+      } else if (err?.status === 404){
+        setWorksError("No se encontraron proyectos")
+        setLoadingWorks(false)
+      } else {
+        setWorksError("Error al cargar los proyectos")
+        setLoadingWorks(false)
+      }
       toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
     } finally {
-      setLoading(false)
+      setLoadingWorks(false)
+    }
+  }
+
+  async function fetchData() {
+    if (!user?.id) return
+    setLoadingCustomers(true)
+    try {
+      const data = await getCustomersByUserId(user.id);
+      setCustomers(data);
+    } catch (err: any) {
+      setCustomersError(err.message ?? "Error al obtener customers");
+      setLoadingCustomers(false);
+
+    } finally {
+      setLoadingCustomers(false);
     }
   }
 
   useEffect(() => {
-    fetchWorks()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchData()
+    // fetchWorks()
   }, [user?.id, user?.role])
+
+  useEffect(() => {
+    fetchWorks()
+  }, [user?.id, user?.role, customers])
 
   useEffect(() => {
     // Asegurarse de que estamos en el cliente antes de manipular el estado
     if (typeof window !== "undefined") {
       // Inicializar con el primer proyecto expandido si no hay ninguno expandido
       if (expandedProjects.length === 0 && works.length > 0) {
-        setExpandedProjects([works[0].id])
+        setExpandedProjects([works[0]._id])
       }
     }
   }, [works])
 
   // Filtrado local
-  const filteredProjects = works.filter((work: Work) => {
+  const filteredProjects = works?.filter((work: Work) => {
     const matchesSearch = (work.projectName ?? "").toLowerCase().includes(searchTerm.toLowerCase())
     const matchesStatus = statusFilter === "Todos" || work.statusWork === statusFilter
     return matchesSearch && matchesStatus
   })
+
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -106,7 +141,7 @@ export default function ClientProjectsPage() {
     }
   }
 
-  const toggleProjectExpansion = (projectId: number) => {
+  const toggleProjectExpansion = (projectId: string) => {
     setExpandedProjects((prev) => {
       if (prev.includes(projectId)) {
         return prev.filter((id) => id !== projectId)
@@ -119,7 +154,8 @@ export default function ClientProjectsPage() {
   // Flag visual del rol del usuario
   const renderUserRoleFlag = () => {
     if (!user?.role) return null
-    const roleLower = user.role.toLowerCase()
+    const roleLower = user?.role.toLowerCase()
+    // console.log('user.role = ', user.role)
     const isAdmin = roleLower === "admin"
     return (
       <div style={{ position: "absolute", top: 16, right: 16, zIndex: 1000 }}>
@@ -132,7 +168,7 @@ export default function ClientProjectsPage() {
           fontSize: 14,
           boxShadow: "0 2px 6px rgba(0,0,0,0.08)"
         }}>
-          {isAdmin ? "ADMIN" : "CUSTOMER"} <span style={{fontWeight:400, fontSize:12}}>({user.role})</span>
+          {isAdmin ? "ADMIN" : user?.role.toLocaleUpperCase()} <span style={{fontWeight:400, fontSize:12}}>({user.role})</span>
         </span>
       </div>
     )
@@ -173,103 +209,74 @@ export default function ClientProjectsPage() {
                 <SelectContent>
                   <SelectItem value="Todos">Todos los Estados</SelectItem>
                   <SelectItem value="Planificación">Planificación</SelectItem>
-                  <SelectItem value="En Progreso">En Progreso</SelectItem>
+                  <SelectItem value="En progreso">En Progreso</SelectItem>
                   <SelectItem value="En Pausa">En Pausa</SelectItem>
                   <SelectItem value="Completado">Completado</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-4">
-              {loading && <div className="text-center py-6">Cargando trabajos...</div>}
-              {error && <div className="text-center py-6 text-red-500">{error}</div>}
-              {filteredProjects.map((work) => (
+              {
+                loadingWorks && <div className="text-center py-8 flex justify-center items-center p-6">
+                  <Loader2 className="animate-spin text-primary" size={24} />
+                  <p className="px-6">Cargando trabajos...</p>
+                </div>
+              }
+              {worksError && <div className="text-center py-6 text-red-500">{worksError}</div>}
+              {filteredProjects?.map((work) => (
                 <Collapsible
-                  key={work.id}
-                  open={expandedProjects.includes(work.id)}
+                  key={work._id}
+                  open={expandedProjects.includes(work._id)}
                   className="border rounded-lg overflow-hidden"
                 >
                   <div className="p-4 bg-card">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <Building className="h-5 w-5 text-muted-foreground" />
-                        <h3 className="text-lg font-semibold">{work.projectName ?? ""}</h3>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(work.statusWork ?? "")}`}
-                        >
-                          {work.statusWork ?? ""}
-                        </span>
+                    <div className="flex items-center gap-4">
+                      <Building className="h-6 w-6 text-muted-foreground" />
+                      <div>
+                        <h3 className="font-semibold">{work.name}</h3>
+                        <p className="text-sm text-muted-foreground">Cliente: {work.customerName}</p>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => toggleProjectExpansion(work.id)}
-                        >
-                          {expandedProjects.includes(work.id) ? (
-                            <ChevronUp className="h-4 w-4" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4" />
-                          )}
-                          <span className="sr-only">Mostrar detalles</span>
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0" asChild>
-                          <a href={`/client/projects/${work.id}`}>
-                            <ExternalLink className="h-4 w-4" />
-                            <span className="sr-only">Ver proyecto</span>
-                          </a>
-                        </Button>
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <div className="flex flex-col md:flex-row justify-between text-sm text-muted-foreground mb-2">
-                        <div>{work.address}</div>
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          <span>{formatDate(work.startDate ?? "")}</span>
-                          <span className="mx-1">-</span>
+                      <div className="flex items-center gap-4 ml-auto">
+                        <div className={`text-sm font-medium ${getStatusColor(work.statusWork ?? "")}`}>{work.statusWork ?? ""}</div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
                           <span>{formatDate(work.endDate ?? "")}</span>
                         </div>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {work.milestones.filter((m: Milestone) => m.completed).length} de {work.milestones.length} hitos
-                        completados
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" asChild>
+                            <a href={`/client/projects/${work._id}`}>
+                              <ExternalLink className="h-4 w-4" />
+                              <span className="sr-only">Ver proyecto</span>
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => toggleProjectExpansion(work._id)}
+                          >
+                            {expandedProjects.includes(work._id) ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                            <span className="sr-only">Expandir</span>
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
                   <CollapsibleContent>
                     <div className="p-4 border-t bg-muted/30">
                       <div className="mb-4">
-                        <h4 className="font-medium mb-2">Descripción del Proyecto</h4>
-                        <p className="text-sm text-muted-foreground">{work.description ?? ""}</p>
-                      </div>
-
-                      <h4 className="font-medium mb-3">Hitos del Proyecto</h4>
-                      <div className="space-y-3">
-                        {work.milestones && work.milestones.map((milestone: Milestone) => (
-                          <div key={milestone.id} className="flex items-start gap-3">
-                            <div className={`mt-0.5 ${milestone.completed ? "text-green-500" : "text-muted-foreground"}`}>
-                              <CheckCircle2 className="h-4 w-4" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm">{milestone.description}</span>
-                                {milestone.completed && (
-                                  <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300 px-2 py-0.5 rounded-full">
-                                    Completado
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-xs text-muted-foreground">{formatDate(milestone.date)}</span>
-                            </div>
-                          </div>
-                        ))}
+                        <h4 className="font-medium mb-2">Nombre del Proyecto</h4>
+                        <p className="text-sm">{work.name ?? ""}</p>
                       </div>
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
               ))}
-              {filteredProjects.length === 0 && (
+              {!worksError && !loadingWorks && filteredProjects?.length === 0 && (
                 <div className="text-center py-6 text-muted-foreground border rounded-lg">
                   No se encontraron proyectos. Intenta ajustar tu búsqueda.
                 </div>

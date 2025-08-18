@@ -1,6 +1,5 @@
 "use client"
 
-// Inspired by react-hot-toast library
 import * as React from "react"
 
 import type {
@@ -8,8 +7,8 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_LIMIT = 5 // Aumentado para permitir múltiples toasts
+const TOAST_REMOVE_DELAY = 5000 // Reducido a 5 segundos
 
 type ToasterToast = ToastProps & {
   id: string
@@ -93,13 +92,16 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
-      if (toastId) {
-        addToRemoveQueue(toastId)
+      // Limpiar timeout si existe
+      if (toastId && toastTimeouts.has(toastId)) {
+        clearTimeout(toastTimeouts.get(toastId)!)
+        toastTimeouts.delete(toastId)
       } else {
         state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id)
+          if (toastTimeouts.has(toast.id)) {
+            clearTimeout(toastTimeouts.get(toast.id)!)
+            toastTimeouts.delete(toast.id)
+          }
         })
       }
 
@@ -145,7 +147,7 @@ type Toast = Omit<ToasterToast, "id">
 function toast({ ...props }: Toast) {
   const id = genId()
 
-  const update = (props: ToasterToast) =>
+  const update = (props: Partial<ToasterToast>) =>
     dispatch({
       type: "UPDATE_TOAST",
       toast: { ...props, id },
@@ -158,7 +160,7 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
-      onOpenChange: (open) => {
+      onOpenChange: (open: boolean) => {
         if (!open) dismiss()
       },
     },
@@ -181,8 +183,12 @@ function useToast() {
       if (index > -1) {
         listeners.splice(index, 1)
       }
+
+      // Limpiar todos los timeouts al desmontar
+      toastTimeouts.forEach((timeout) => clearTimeout(timeout))
+      toastTimeouts.clear()
     }
-  }, [state])
+  }, [])
 
   return {
     ...state,
@@ -192,3 +198,4 @@ function useToast() {
 }
 
 export { useToast, toast }
+export type { ToasterToast as Toast }

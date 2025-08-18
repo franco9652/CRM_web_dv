@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,63 +15,87 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building, Calendar, ClipboardList, MoreHorizontal, Plus, Search } from "lucide-react"
+import { Building, Calendar, ClipboardList, Loader2, MoreHorizontal, Plus, Search } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
-import { getWorks, Work } from "@/services/works"
+import { getAllWorks, getWorks, Work } from "@/services/works"
 
 // Estados de los proyectos
 const projectStatus = [
   { value: "Todos", label: "Todos los Estados" },
-  { value: "Planificación", label: "Planificación" },
-  { value: "En Progreso", label: "En Progreso" },
-  { value: "En Pausa", label: "En Pausa" },
-  { value: "Completado", label: "Completado" },
+  { value: "activo", label: "Activo" },
+  { value: "En progreso", label: "En Progreso" },
+  { value: "inactivo", label: "Inactivo" },
 ]
 
 export default function ProjectsPage() {
   const router = useRouter()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("Todos")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [selectedProject, setSelectedProject] = useState<number | null>(null)
-  const [newMilestone, setNewMilestone] = useState({
-    date: "",
-    description: "",
-  })
   const [projects, setProjects] = useState<Work[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   useEffect(() => {
     setLoading(true)
-    getWorks(page)
+    getAllWorks()
       .then((data) => {
-        setProjects(data.works)
-        setTotalPages(data.totalPages)
+        setProjects(data)
         setLoading(false)
       })
-      .catch((err) => {
+      .catch(() => {
         setError("Error al cargar los trabajos")
         setLoading(false)
       })
-  }, [page])
+  }, [])
 
-  const filteredProjects = projects.filter(
-    (project) =>
-      (project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (project.customerName || "").toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (statusFilter === "Todos" || project.statusWork === statusFilter),
+  const filteredProjects = useMemo(() => 
+    projects.filter(
+      (project) =>
+        (project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (project.customerName || "").toLowerCase().includes(searchTerm.toLowerCase())) &&
+        (statusFilter === "Todos" || project.statusWork === statusFilter)
+    ),
+    [projects, searchTerm, statusFilter]
   )
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("es-ES", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }).format(date)
+  // Pagination logic
+  const totalPages = Math.ceil(filteredProjects.length / itemsPerPage)
+  const currentItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredProjects.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredProjects, currentPage, itemsPerPage])
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const formatDate = (dateString?: string | null) => {
+    // Validar que la fecha existe y no está vacía
+    if (!dateString || dateString.trim() === '') {
+      return '-';
+    }
+  
+    try {
+      const date = new Date(dateString);
+      
+      // Verificar que la fecha es válida
+      if (isNaN(date.getTime())) {
+        console.warn(`Fecha inválida recibida: ${dateString}`);
+        return '-';
+      }
+  
+      return new Intl.DateTimeFormat("es-ES", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(date);
+    } catch (error) {
+      console.error(`Error al formatear fecha: ${dateString}`, error);
+      return '-';
+    }
   }
 
   const getStatusColor = (status?: string) => {
@@ -91,10 +115,6 @@ export default function ProjectsPage() {
 
   const navigateToProjectDetails = (projectId: string) => {
     router.push(`/admin/projects/${projectId}`)
-  }
-
-  const navigateToAddMilestone = (projectId: string) => {
-    router.push(`/admin/projects/${projectId}/milestones`)
   }
 
   return (
@@ -141,9 +161,18 @@ export default function ProjectsPage() {
             </Select>
           </div>
           {loading ? (
-            <div className="text-center py-8">Cargando trabajos...</div>
+            <CardContent>
+              <div className="flex items-center justify-center h-[50vh]">
+                <div className="text-center py-8 flex justify-center items-center p-6">
+                  <Loader2 className="animate-spin text-primary" size={24} />
+                  <p className="px-6">Cargando proyectos...</p>          
+                </div>
+              </div>
+            </CardContent>
           ) : error ? (
-            <div className="text-center text-red-500 py-8">{error}</div>
+            <CardContent>
+              <div className="text-center text-red-500 py-8">{error}</div>
+            </CardContent>
           ) : (
             <>
               <div className="rounded-md border">
@@ -154,13 +183,12 @@ export default function ProjectsPage() {
                       <TableHead>Cliente</TableHead>
                       <TableHead>Cronograma</TableHead>
                       <TableHead>Presupuesto</TableHead>
-                      <TableHead>Progreso</TableHead>
                       <TableHead>Estado</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredProjects.map((project) => (
+                    {currentItems.map((project) => (
                       <TableRow key={project._id}>
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -172,18 +200,25 @@ export default function ProjectsPage() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3 text-muted-foreground" />
-                            <span>{formatDate(project.startDate ?? "")}</span>
-                            <span className="mx-1">-</span>
-                            <span>{formatDate(project.endDate ?? "")}</span>
+                            {project.startDate ? (
+                              <>
+                                <span>{formatDate(project.startDate)}</span>
+                                {project.endDate && (
+                                  <>
+                                    <span className="mx-1">-</span>
+                                    <span>{formatDate(project.endDate)}</span>
+                                  </>
+                                )}
+                                {!project.endDate && (
+                                  <span className="text-muted-foreground ml-1">(sin fecha fin)</span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">Sin fecha de inicio</span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell>{typeof project.budget === 'number' ? `$${project.budget.toLocaleString()}` : '-'}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Progress value={project.progress || 0} className="h-2 w-[60px]" />
-                            <span className="text-xs">{project.progress || 0}%</span>
-                          </div>
-                        </TableCell>
                         <TableCell>
                           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(project.statusWork)}`}>
                             {project.statusWork || '-'}
@@ -206,14 +241,6 @@ export default function ProjectsPage() {
                                 Editar Proyecto
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => navigateToAddMilestone(project._id)}>
-                                <ClipboardList className="mr-2 h-4 w-4" />
-                                Agregar Hito
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project._id}/milestones`)}>
-                                Ver Hitos
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project._id}/budget`)}>
                                 Gestionar Presupuesto
                               </DropdownMenuItem>
@@ -228,10 +255,36 @@ export default function ProjectsPage() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {filteredProjects.length === 0 && (
+                    {filteredProjects.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
                           No se encontraron proyectos. Intenta ajustar tu búsqueda o crear un nuevo proyecto.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4">
+                          <div className="flex items-center justify-between">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => handlePageChange(currentPage - 1)}
+                              disabled={currentPage === 1}
+                            >
+                              Anterior
+                            </Button>
+                            <span className="text-sm text-muted-foreground">
+                              Página {currentPage} de {totalPages}
+                            </span>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handlePageChange(currentPage + 1)}
+                              disabled={currentPage === totalPages || totalPages === 0}
+                            >
+                              Siguiente
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     )}

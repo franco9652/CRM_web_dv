@@ -23,7 +23,7 @@ export default function ClientHeader() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-4 border-b bg-background px-4 sm:px-6">
       <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setShowMobileMenu(!showMobileMenu)}>
         <Menu className="h-5 w-5" />
         <span className="sr-only">Alternar menú</span>
@@ -32,15 +32,6 @@ export default function ClientHeader() {
       <div className="flex items-center">
         <span className="font-semibold text-lg">Constructora Acme</span>
         <span className="ml-2 text-sm text-muted-foreground hidden md:inline">Portal de Cliente</span>
-      </div>
-
-      <div className="w-full flex-1 max-w-md ml-4">
-        <form>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input type="search" placeholder="Buscar proyectos, documentos..." className="w-full bg-background pl-8" />
-          </div>
-        </form>
       </div>
 
       <div className="flex items-center gap-2">
