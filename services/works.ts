@@ -142,6 +142,6 @@ export async function getWorkById(workId: string): Promise<Work | null> {
 
 export async function updateWork(workId: string, workData: UpdateWorkInput): Promise<Work> {
   if (!workId) throw new Error("WorkId inválido");
-  const res = await axios.put(`${API_URL}/workUpdate/${workId}`, workData);
+  const res = await axios.patch(`${API_URL}/workUpdate/${workId}`, workData);
   return res.data as Work;
 }

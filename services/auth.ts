@@ -5,6 +5,7 @@ const API_URL = process.env.NODE_ENV === "development"
 export interface LoginResponse {
   token: string;
   userId: string;
+  _id?: string;
   role: string;
   supabaseUserId?: string;
   message?: string;
@@ -13,6 +14,7 @@ export interface LoginResponse {
     name: string;
     email: string;
     role: "admin" | "client";
+    _id?: string;
   };
 }
 

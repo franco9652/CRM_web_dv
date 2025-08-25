@@ -8,6 +8,7 @@ import { loginUser } from "@/services/auth"
 
 type User = {
   id: string
+  _id?: string
   name: string
   email: string
   // role: "admin" | "client" | "customer" | "employee"
@@ -77,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: response.user?.name || email,
         email: response.user?.email || email,
         role: response.user?.role || response.role,
+        _id: response.user?._id || response._id
       }
 
       // Guardar datos del usuario

@@ -181,13 +181,13 @@ export default function AdminDashboard() {
       useEffect(() => {
         if (customers?.length > 0) {
           setCustomersCount(customers?.length);
-          // Count customers with createdAt after 2025-02-03
+          // Count customers with createdAt after 2025-01-03
           const targetDate = new Date('2025-01-03T00:00:00.000Z');
           const futureCustomersCount = customers?.filter(customer => {
             if (!customer?.createdAt) return false; 
             const customerCreatedAt = new Date(customer.createdAt);
             return customerCreatedAt > targetDate;
-          }).length;
+          })?.length;
           setFutureCustomersCount(futureCustomersCount);
         }
       }, [customers]);

@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, Loader2 } from "lucide-react"
+import { ChevronLeft, Loader2, User, Mail } from "lucide-react"
 import { getWorkById, updateWork, Work, UpdateWorkInput } from "@/services/works"
+import { getCustomers } from "@/services/customers"
 import { useToast } from "@/hooks/use-toast"
 
 export default function ProjectEditPage() {
@@ -21,29 +22,60 @@ export default function ProjectEditPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [customers, setCustomers] = useState<Array<{_id: string, name: string, email: string}>>([])
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
 
+  // Fetch customers
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      setIsLoadingCustomers(true);
+      try {
+        const response = await getCustomers();
+        // Assuming getCustomers returns an array of customers with _id, name, and email
+        setCustomers(Array.isArray(response) ? response : response.customers || []);
+      } catch (err) {
+        console.error('Error loading customers:', err);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los clientes",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoadingCustomers(false);
+      }
+    };
+
+    fetchCustomers();
+  }, [toast]);
+
+  // Fetch project data
   useEffect(() => {
     if (params.id) {
       setLoading(true)
       getWorkById(params.id)
         .then((data) => {
           if (data) {
-            setProject(data)
+            setProject(data.work)
             setFormData({
-              name: data.name,
-              address: data.address,
-              startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
-              endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
-              budget: data.budget,
-              statusWork: data.statusWork,
-              customerName: data.customerName,
-              projectType: data.projectType,
+              name: data.work.name || '',
+              address: data.work.address || '',
+              startDate: data.work.startDate ? new Date(data.work.startDate).toISOString().split('T')[0] : '',
+              endDate: data.work.endDate ? new Date(data.work.endDate).toISOString().split('T')[0] : '',
+              budget: data.work.budget || 0,
+              statusWork: data.work.statusWork || 'activo',
+              customerName: data.work.customerName || '',
+              projectType: data.work.projectType || '',
+              email: data.work.email || '',
+              emailCustomer: data.work.emailCustomer || '',
+              number: data.work.number || '',
+              workUbication: data.work.workUbication || ''
             })
           } else {
             setError("Proyecto no encontrado")
           }
         })
-        .catch(() => {
+        .catch((error) => {
+          console.error('Error loading project:', error)
           setError("Error al cargar el proyecto")
         })
         .finally(() => {
@@ -84,7 +116,7 @@ export default function ProjectEditPage() {
     }
   }
 
-  if (loading) {
+  if (loading || isLoadingCustomers) {
     return (
       <div className="flex items-center justify-center h-[50vh]">
         <Loader2 className="animate-spin text-primary" size={32} />
@@ -124,8 +156,50 @@ export default function ProjectEditPage() {
                 <Input id="name" name="name" value={formData.name || ""} onChange={handleChange} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="customerName">Nombre del Cliente</Label>
-                <Input id="customerName" name="customerName" value={formData.customerName || ""} onChange={handleChange} />
+                <Label>Cliente</Label>
+                <Select 
+                  value={formData.customerName}
+                  onValueChange={(value) => {
+                    const selectedCustomer = customers.find(c => c.name === value);
+                    setFormData(prev => ({
+                      ...prev,
+                      customerName: value,
+                      emailCustomer: selectedCustomer?.email || ''
+                    }));
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer._id} value={customer.name}>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          <span>{customer.name}</span>
+                          {customer.email && (
+                            <span className="text-muted-foreground text-xs flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {customer.email}
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="emailCustomer">Email del Cliente</Label>
+                <Input 
+                  id="emailCustomer" 
+                  name="emailCustomer" 
+                  type="email" 
+                  value={formData.emailCustomer || ""} 
+                  onChange={handleChange} 
+                  placeholder="Email del cliente"
+                />
               </div>
             </div>
 
@@ -166,7 +240,36 @@ export default function ProjectEditPage() {
             </div>
              <div className="space-y-2">
                 <Label htmlFor="projectType">Tipo de Proyecto</Label>
-                <Input id="projectType" name="projectType" value={formData.projectType || ""} onChange={handleChange} />
+                <Select 
+                  value={formData.projectType || ""} 
+                  onValueChange={(value) => handleSelectChange("projectType", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar tipo de proyecto" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="residencial">Residencial</SelectItem>
+                    <SelectItem value="comercial">Comercial</SelectItem>
+                    <SelectItem value="industrial">Industrial</SelectItem>
+                    <SelectItem value="Construcción">Construcción</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" name="email" type="email" value={formData.email || ""} onChange={handleChange} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="emailCustomer">Email del Cliente</Label>
+                <Input id="emailCustomer" name="emailCustomer" type="email" value={formData.emailCustomer || ""} onChange={handleChange} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="number">Número</Label>
+                <Input id="number" name="number" value={formData.number || ""} onChange={handleChange} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="workUbication">Ubicación del Trabajo</Label>
+                <Input id="workUbication" name="workUbication" value={formData.workUbication || ""} onChange={handleChange} />
               </div>
           </CardContent>
         </Card>

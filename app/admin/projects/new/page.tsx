@@ -34,8 +34,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { useAuth } from '@/components/auth-provider'
 
 export default function CreateWorkForm() {
+  const { user } = useAuth()
   const router = useRouter();
   const { toast } = useToast();
   const [formData, setFormData] = useState<CreateWorkInput>({
@@ -154,13 +156,16 @@ export default function CreateWorkForm() {
       const uploadPromises = Array.from(files).map(async (file) => {
         const uploadData = new FormData();
         uploadData.append('file', file);
+        if (user?._id) {
+          uploadData.append('userId', user._id.toString());
+        }
 
         if (!token) {
           throw new Error('No se encontró el token de autenticación');
         }
 
         const response = await axios.post<UploadResponse>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${formData.userId}/upload`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${formData.customerId}/upload`,
           uploadData,
           {
             headers: {

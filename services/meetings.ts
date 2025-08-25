@@ -4,23 +4,57 @@ import axios from "axios";
 const API_URL = "https://crmdbsoft.zeabur.app";
 
 export interface Meeting {
-  _id: string;
+  _id?: string;
   title: string;
-  description: string;
-  startTime: Date;
-  endTime: Date;
+  customer: {
+    _id: string;
+    name: string;
+    email: string;
+  };
+  project: {
+    _id: string;
+    title: string;
+  };
+  date: Date | string;
+  time: string;
+  duration: string;
+  meetingType: string;
+  meetingLink?: string;
+  address?: string;
+  description?: string;
+  status?: 'scheduled' | 'completed' | 'cancelled';
+  createdAt?: string;
+  updatedAt?: string;
+  participants?: string[];
   location?: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
-  customer: string; // Customer ID
-  project?: string; // Project ID (optional)
-  createdAt: string;
-  updatedAt: string;
-  [key: string]: any;
+  link?: string;
+  type?: string;
+  attendees?: number;
 }
 
 export interface MeetingsResponse {
   message: string;
   meetings: Meeting[];
+  error?: string;
+  details?: string;
+}
+
+export async function getAllMeetings(): Promise<MeetingsResponse> {
+  try {
+    const token = localStorage.getItem('token');
+    const { data } = await axios.get<MeetingsResponse>(
+      `${API_URL}/meetings`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    return data;
+  } catch (error) {
+    console.error('Error al obtener las reuniones:', error);
+    throw error;
+  }
 }
 
 /**
@@ -39,6 +73,50 @@ export async function getMeetingsByUsername(username: string): Promise<MeetingsR
     return data;
   } catch (error) {
     console.error('Error al obtener las reuniones:', error);
-    throw error; // Puedes manejar el error de forma más específica si lo prefieres
+    throw error;
+  }
+}
+
+export async function createMeeting(meetingData: Omit<Meeting, '_id'>): Promise<Meeting> {
+  try {
+    const response = await axios.post<Meeting>(
+      `${API_URL}/meetings`,
+      meetingData
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error creating meeting:', error);
+    throw new Error(error.response?.data?.message || 'Error al crear la reunión');
+  }
+}
+
+export async function updateMeeting(id: string, meetingData: Partial<Meeting>): Promise<Meeting> {
+  try {
+    const response = await axios.put<Meeting>(
+      `${API_URL}/meetings/${id}`,
+      meetingData
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error updating meeting:', error);
+    throw new Error(error.response?.data?.message || 'Error al actualizar la reunión');
+  }
+}
+
+export async function deleteMeeting(id: string): Promise<void> {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
+    await axios.delete(`${API_URL}/meetings/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+  } catch (error: any) {
+    console.error('Error deleting meeting:', error);
+    throw new Error(error.response?.data?.message || 'Error al eliminar la reunión');
   }
 }
