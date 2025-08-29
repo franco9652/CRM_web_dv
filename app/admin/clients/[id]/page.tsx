@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChevronLeft, Loader2, User, Mail, Phone, MapPin, IdCard, MapPinned, FileText,  } from "lucide-react"
+import { ChevronLeft, Loader2, User, Mail, Phone, MapPin, IdCard, MapPinned, FileText, Pencil } from "lucide-react"
 import { getCustomersByUserId, Customer } from "@/services/customers"
 import { Tabs, TabsList, TabsTrigger } from "@radix-ui/react-tabs"
 
@@ -101,6 +101,15 @@ export default function ClientDetailsPage() {
             Volver
           </Button>
         </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => router.push(`/admin/clients/${params.id}/edit`)}
+          className="ml-auto"
+        >
+          <Pencil className="mr-1 h-4 w-4" />
+          Editar
+        </Button>
       </div>
 
       <Card>

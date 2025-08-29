@@ -5,25 +5,33 @@ const API_URL = "https://crmdbsoft.zeabur.app";
 
 export interface Budget {
   _id: string;
-  userId: string;
+  workId: string;
   customerId: string;
-  items: Array<{
-    description: string;
-    quantity: number;
-    price: number;
-  }>;
-  total: number;
-  status: 'draft' | 'sent' | 'accepted' | 'rejected';
-  createdAt: string;
-  updatedAt: string;
+  customerName: string;
+  email: string;
+  projectAddress: string;
+  projectType: string;
+  m2: string;
+  levels: string;
+  rooms: string;
+  materials: string[];
+  demolition: boolean;
+  approvals: string[];
+  budgetDate: string;
+  subcontractors: string[];
+  startDate: string;
+  endDate: string;
+  estimatedBudget: number;
+  currency: string;
+  advancePayment: boolean;
+  documentation: string[];
+  status: string;
+  ID: number;
+  __v: number;
   [key: string]: any;
 }
 
-export interface BudgetsResponse {
-  page: number;
-  totalPages: number;
-  budgets: Budget[];
-}
+export type BudgetsResponse = Budget[];
 
 /**
  * Obtiene todos los presupuestos

@@ -55,6 +55,7 @@ export default function ClientsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [passwordError, setPasswordError] = useState("")
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true)
   const [customersCount, setCustomersCount] = useState(0)
@@ -121,9 +122,35 @@ export default function ClientsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const validatePassword = (password: string) => {
+    if (!password) {
+      return "La contraseña no puede estar vacía."
+    }
+    if (password.length < 8) {
+      return "La contraseña debe tener al menos 8 caracteres."
+    }
+    if (!/[A-Z]/.test(password)) {
+      return "La contraseña debe incluir al menos una letra mayúscula."
+    }
+    if (!/[!@#$%^&*()_\-+={}\[\]|:;\"'<>,.?/~`]/.test(password)) {
+      return "La contraseña debe incluir al menos un símbolo (por ejemplo !@#$%)."
+    }
+    return ""
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    
+    // Validate password
+    const passwordValidation = validatePassword(newCustomer.password)
+    if (passwordValidation) {
+      setPasswordError(passwordValidation)
+      return
+    }
+    
     setIsSubmitting(true)
+    setPasswordError("")
+
     
     try {
       // Create a new customer object with all fields from the form
@@ -307,20 +334,34 @@ export default function ClientsPage() {
                   />
                 </div>
               <div className="grid gap-2">
-                <Label htmlFor="password">Contraseña</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Contraseña <span className="text-red-500">*</span></Label>
+                  {passwordError && <span className="text-xs text-red-500">{passwordError}</span>}
+                </div>
                 <Input
                   id="password"
                   type="password"
                   value={newCustomer.password}
-                  onChange={(e) => setNewCustomer({ ...newCustomer, password: e.target.value })}
+                  onChange={(e) => {
+                    setNewCustomer({ ...newCustomer, password: e.target.value })
+                    // Clear error when user starts typing
+                    if (passwordError) {
+                      setPasswordError("")
+                    }
+                  }}
+                  className={passwordError ? "border-red-500" : ""}
+                  required
                 />
+                <p className="text-xs text-muted-foreground">
+                  La contraseña debe tener al menos 8 caracteres, una mayúscula y un símbolo.
+                </p>
               </div>
               </div>
               <DialogFooter>
               <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || !!passwordError}>
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -415,7 +456,7 @@ export default function ClientsPage() {
                           <DropdownMenuItem onClick={() => (window.location.href = `/admin/clients/${client.userId}`)}>
                             Ver Detalles
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => (window.location.href = `/admin/clients/${client.id}/edit`)}>
+                          <DropdownMenuItem onClick={() => (window.location.href = `/admin/clients/${client.userId}/edit`)}>
                             Editar Cliente
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />

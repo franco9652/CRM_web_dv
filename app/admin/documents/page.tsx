@@ -1,8 +1,10 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import axios from "axios"
+import { useAuth } from "@/components/auth-provider"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -16,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building, Download, Eye, FileText, MoreHorizontal, Plus, Search, Upload } from "lucide-react"
+import { Building, Download, Eye, FileText, Loader2, MoreHorizontal, Plus, Search, Upload, User } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -126,6 +128,14 @@ export default function DocumentsPage() {
   const [projectFilter, setProjectFilter] = useState("Todos")
   const [categoryFilter, setCategoryFilter] = useState("Todas")
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [token, setToken] = useState<string | null>(null)
+  const { user } = useAuth()
+  const { toast } = useToast()
+
+  const [customers, setCustomers] = useState<Array<{_id: string, name: string}>>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState("");
 
   const [newDocument, setNewDocument] = useState({
     name: "",
@@ -171,16 +181,172 @@ export default function DocumentsPage() {
   // Extraer categorías únicas para el filtro
   const categories = ["Todas", ...Array.from(new Set(documents.map((doc) => doc.category)))]
 
+  useEffect(() => {
+    // Get token from localStorage
+    const authToken = localStorage.getItem('token')
+    if (authToken) {
+      setToken(authToken)
+    }
+
+    // Fetch customers
+    const fetchCustomers = async () => {
+      try {
+        const response: any = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/customers`, {
+          headers: {
+            'Authorization': `Bearer ${authToken}`
+          }
+        });
+        setCustomers(response.data.customers || []);
+      } catch (error) {
+        console.error('Error fetching customers:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudieron cargar los clientes',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    if (authToken) {
+      fetchCustomers();
+    }
+  }, [])
+
+  interface UploadResponse {
+    message: string
+    document: {
+      fileName: string
+      originalName: string
+      mimeType: string
+      size: number
+      url: string
+    }
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setNewDocument({ ...newDocument, file: e.target.files[0] })
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0 || !user?._id) return
+
+    setIsUploading(true)
+    setUploadProgress(0)
+
+    try {
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const uploadData = new FormData()
+        uploadData.append('file', file)
+        uploadData.append('userId', user?._id.toString())
+
+        if (!token) {
+          throw new Error('No se encontró el token de autenticación')
+        }
+
+        if (!selectedCustomer) {
+          throw new Error('Por favor seleccione un cliente');
+        }
+
+        const response: any = await axios.post<UploadResponse>(
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${selectedCustomer}/upload`,
+          uploadData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              'Authorization': `Bearer ${token}`
+            },
+            onUploadProgress: (progressEvent: any) => {
+              if (progressEvent.lengthComputable) {
+                const percentCompleted = Math.round(
+                  (progressEvent.loaded * 100) / progressEvent.total
+                )
+                setUploadProgress(percentCompleted)
+              }
+            },
+          } as any
+        )
+
+        if (response.data?.document?.url) {
+          return {
+            name: file.name,
+            url: response.data.document.url,
+            size: file.size,
+            type: file.type
+          }
+        }
+        throw new Error('No se pudo obtener la URL del archivo subido')
+      })
+
+      const uploadedFiles = await Promise.all(uploadPromises)
+      
+      // Update documents state with new files
+      const newDocs = uploadedFiles.map((file, index) => ({
+        id: documents.length + index + 1,
+        name: file.name,
+        project: newDocument.project,
+        category: newDocument.category,
+        type: file.name.split('.').pop()?.toUpperCase() || 'FILE',
+        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        uploadDate: new Date().toISOString().split('T')[0],
+        uploadedBy: user.name || 'Usuario',
+        status: 'Pendiente',
+        url: file.url
+      }))
+
+      setDocuments(prev => [...prev, ...newDocs])
+      
+      toast({
+        title: 'Éxito',
+        description: 'Documentos subidos correctamente',
+        variant: 'default',
+      })
+      
+      // Reset form
+      setNewDocument({
+        name: "",
+        project: "",
+        category: "",
+        description: "",
+        file: null,
+      })
+      
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      toast({
+        title: 'Error',
+        description: 'Error al subir los documentos',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsUploading(false)
+      setUploadProgress(0)
+      setIsUploadDialogOpen(false)
+    }
+  }
+
   const handleUploadDocument = () => {
-    if (!newDocument.name || !newDocument.project || !newDocument.category || !newDocument.file) {
-      alert("Por favor complete todos los campos requeridos")
-      return
+    if (!newDocument.project || !newDocument.category) {
+      toast({
+        title: 'Error',
+        description: 'Por favor complete los campos de proyecto y categoría',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    if (fileInput && fileInput.files && fileInput.files.length > 0) {
+      const event = { target: fileInput } as unknown as React.ChangeEvent<HTMLInputElement>;
+      handleFileUpload(event);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Por favor seleccione al menos un archivo',
+        variant: 'destructive',
+      });
     }
 
     const id = documents.length > 0 ? Math.max(...documents.map((d) => d.id)) + 1 : 1
@@ -191,8 +357,8 @@ export default function DocumentsPage() {
       name: newDocument.name,
       project: newDocument.project,
       category: newDocument.category,
-      type: newDocument.file.name.split(".").pop()?.toUpperCase() || "PDF",
-      size: `${(newDocument.file.size / (1024 * 1024)).toFixed(1)} MB`,
+      type: newDocument.file?.name.split(".").pop()?.toUpperCase() || "PDF",
+      size: `${(newDocument?.file?.size / (1024 * 1024)).toFixed(1)} MB`,
       uploadDate: now.toISOString().split("T")[0],
       uploadedBy: "Juan Pérez", // Usuario actual
       status: "Pendiente",
@@ -232,17 +398,32 @@ export default function DocumentsPage() {
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="doc-name">Nombre del Documento</Label>
-                <Input
-                  id="doc-name"
-                  value={newDocument.name}
-                  onChange={(e) => setNewDocument({ ...newDocument, name: e.target.value })}
-                  placeholder="Ej: Torre Skyline - Planos de Planta"
-                />
+                <Label htmlFor="customer-select">Cliente</Label>
+                <Select 
+                  value={selectedCustomer} 
+                  onValueChange={setSelectedCustomer}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccione un cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer._id} value={customer._id}>
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4" />
+                          {customer.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="doc-project">Proyecto</Label>
+                <Label htmlFor="doc-project">Proyecto</Label>
+
                   <Select
                     value={newDocument.project}
                     onValueChange={(value) => setNewDocument({ ...newDocument, project: value })}
@@ -288,18 +469,50 @@ export default function DocumentsPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="doc-file">Archivo</Label>
-                <Input id="doc-file" type="file" onChange={handleFileChange} />
+                <Label htmlFor="file-upload">Archivo</Label>
+                <Input 
+                  id="file-upload"
+                  type="file"
+                  onChange={(e) => {
+                    handleFileChange(e);
+                    handleFileUpload(e);
+                  }}
+                  multiple
+                />
                 <p className="text-xs text-muted-foreground">
                   Formatos aceptados: PDF, DOCX, XLSX, DWG, JPG, PNG, ZIP (máx. 50MB)
                 </p>
+                {isUploading && (
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                )}
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsUploadDialogOpen(false)}
+                disabled={isUploading}
+              >
                 Cancelar
               </Button>
-              <Button onClick={handleUploadDocument}>Subir Documento</Button>
+              <Button 
+                onClick={() => document.getElementById('file-upload')?.click()}
+                disabled={isUploading}
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Subiendo...
+                  </>
+                ) : (
+                  'Seleccionar y Subir Documento'
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -403,29 +616,13 @@ export default function DocumentsPage() {
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">
                             <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Abrir menú</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                          <DropdownMenuItem>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver Documento
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Download className="mr-2 h-4 w-4" />
-                            Descargar
-                          </DropdownMenuItem>
+                          <DropdownMenuItem>Ver detalles</DropdownMenuItem>
+                          <DropdownMenuItem>Descargar</DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Agregar Versión
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>Compartir con Cliente</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600 focus:text-red-600">
-                            Eliminar Documento
-                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600">Eliminar</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

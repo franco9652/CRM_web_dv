@@ -127,11 +127,21 @@ export async function createWork(workData: CreateWorkInput): Promise<{ message: 
   }
 }
 
-// Obtener trabajos por customerId (CORREGIDO: ahora usa /workgetbyid/:id)
-export async function getWorksByCustomerId(userId: string): Promise<Work[]> {
+// Obtener trabajos por customerId con información del cliente
+export interface WorksByCustomerResponse {
+  message: string;
+  customerInfo: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  works: Work[];
+}
+
+export async function getWorksByCustomerId(userId: string): Promise<WorksByCustomerResponse> {
   if (!userId) throw new Error("CustomerId inválido");
   const res = await axios.get(`${API_URL}/workgetbycustomerid/${userId}`);
-  return res.data as Work[];
+  return res.data as WorksByCustomerResponse;
 }
 
 export async function getWorkById(workId: string): Promise<Work | null> {
