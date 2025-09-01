@@ -16,6 +16,7 @@ type User = {
   department?: string
   position?: string
   contactName?: string
+  customerId?: string
 }
 
 type AuthContextType = {
@@ -78,7 +79,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: response.user?.name || email,
         email: response.user?.email || email,
         role: response.user?.role || response.role,
-        _id: response.user?._id || response._id
+        _id: response.user?._id || response._id,
+        customerId: response.role === "customer" ? response.customerId : undefined
       }
 
       // Guardar datos del usuario

@@ -51,14 +51,13 @@ export default function ClientProjectsPage() {
         data = response.works
       } else if (user.role === "client" || user.role === "customer" || user.role === "employee") {
         // Obtener solo los proyectos del cliente o empleado
-        if (!user.id) throw new Error("ID de cliente no válido")
-        // const worksResult = await getWorksByCustomerId(user.id)
-        const worksResult = await getWorksByCustomerId("678ac8bbcaa29603b2663cba")
-        data = worksResult as Work[]
+        if (!user._id) throw new Error("ID de cliente no válido")
+        const response = await getWorksByCustomerId(user._id)
+        data = response.works || []
       } else {
         throw new Error("Rol de usuario no soportado")
       }
-      setWorks(data.works)
+      setWorks(data)
     } catch (err: any) {
       if(err?.status === 400){
         setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)

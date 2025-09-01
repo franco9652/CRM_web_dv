@@ -1,18 +1,32 @@
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, ArrowLeft, Users } from "lucide-react"
+import { Calendar, ArrowLeft, Users, Download, Table, Eye } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 import { type Work, getWorkById } from "@/services/works"
 import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { Loader2 } from "lucide-react"
+import { TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"
 
 const formatDate = (dateString: string) => {
   if (!dateString) return "Fecha no disponible";
   const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
   return new Date(dateString).toLocaleDateString('es-ES', options);
+};
+
+const getFileNameFromUrl = (url: string) => {
+  if (!url) return 'Documento sin nombre';
+  try {
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/');
+    const fileName = pathParts[pathParts.length - 1];
+    // Remove any query parameters if present
+    return fileName.split('?')[0];
+  } catch (e) {
+    return 'Documento';
+  }
 };
 
 const getStatusColor = (status: string | undefined) => {
@@ -177,6 +191,62 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Documentos</CardTitle>
+        </CardHeader>
+        {
+          work?.documents && work?.documents.length > 0 ? (
+        <CardContent>
+          <div className="w-full overflow-auto">
+            <table className="w-full caption-bottom text-sm">
+              <thead className="[&_tr]:border-b">
+                <tr className="border-b transition-colors hover:bg-muted/50">
+                  <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Nombre</th>
+                  <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="[&_tr:last-child]:border-0">
+                {work?.documents?.map((docUrl: string, index: number) => (
+                  <tr key={index} className="border-b transition-colors hover:bg-muted/50">
+                    <td className="p-4 align-middle">
+                      <div className="font-medium">{getFileNameFromUrl(docUrl)}</div>
+                    </td>
+                    <td className="p-4 align-middle text-right">
+                      <div className="flex justify-end gap-2">
+                        <a 
+                          href={docUrl} 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 w-9"
+                          title="Ver documento"
+                        >
+                          <Eye className="h-4 w-4" />
+                          <span className="sr-only">Ver</span>
+                        </a>
+                        <a 
+                          href={docUrl}
+                          download
+                          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 w-9"
+                          title="Descargar documento"
+                        >
+                          <Download className="h-4 w-4" />
+                          <span className="sr-only">Descargar</span>
+                        </a>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      ) : (
+        <CardContent>
+          <p className="text-center text-muted-foreground">No hay documentos disponibles para este proyecto.</p>
+        </CardContent>
+      )}
+      </Card>
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
 import { createWork, CreateWorkInput } from '@/services/works';
-import { getCustomers, Customer } from '@/services/customers';
+import { getAllCustomers, Customer } from '@/services/customers';
 import { getAllEmployees, Employee } from '@/services/employees';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -81,12 +81,12 @@ export default function CreateWorkForm() {
       setIsLoading(true);
       try {
         // Fetch customers and employees in parallel
-        const [customersResponse, employeesList] = await Promise.all([
-          getCustomers(),
+        const [allCustomers, employeesList] = await Promise.all([
+          getAllCustomers(),
           getAllEmployees()
         ]);
         
-        setCustomers(customersResponse.customers || []);
+        setCustomers(Array.isArray(allCustomers) ? allCustomers : []);
         setEmployees(employeesList || []);
       } catch (err) {
         setError('Error al cargar los datos');

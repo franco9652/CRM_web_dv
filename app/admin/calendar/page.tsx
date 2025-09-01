@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -34,6 +34,7 @@ import {
   type Meeting 
 } from "@/services/meetings"
 import { getWorksByCustomerId, type WorksByCustomerResponse, type Work } from "@/services/works"
+import { getAllCustomers, type Customer } from "@/services/customers"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 
@@ -81,24 +82,32 @@ export default function CalendarPage() {
   };
   const [newMeeting, setNewMeeting] = useState<MeetingFormData>(initialFormState);
 
-  // Fetch meetings and derive customers/projects on component mount
+  // Fetch all customers
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const allCustomers = await getAllCustomers();
+      
+      // Map to the expected format for the calendar
+      setCustomers(allCustomers.map(customer => ({
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email || '',
+        phone: customer.phone || (customer as any).contactNumber || '',
+        address: customer.address || ''
+      })));
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    }
+  }, []);
+
+  // Fetch meetings and projects on component mount
   useEffect(() => {
     const fetchAndProcessMeetings = async () => {
       try {
         setLoading(true);
         const response = await getAllMeetings();
         const fetchedMeetings = response.meetings || [];
-        console.log('response: ', response)
         setMeetings(fetchedMeetings);
-
-        // Derive unique customers from meetings
-        const uniqueCustomers = new Map<string, Meeting['customer']>();
-        fetchedMeetings.forEach(meeting => {
-          if (meeting.customer?._id) {
-            uniqueCustomers.set(meeting.customer._id, meeting.customer);
-          }
-        });
-        setCustomers(Array.from(uniqueCustomers.values()));
         
         // Derive unique projects from meetings
         const uniqueProjects = new Map<string, Meeting['project']>();
@@ -116,8 +125,9 @@ export default function CalendarPage() {
       }
     };
 
+    fetchCustomers();
     fetchAndProcessMeetings();
-  }, []);
+  }, [fetchCustomers]);
   
   // Filter meetings based on search term, customer, and meeting type
   const filteredMeetings = meetings.filter((meeting) => {
