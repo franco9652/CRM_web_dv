@@ -92,9 +92,19 @@ export async function createMeeting(meetingData: Omit<Meeting, '_id'>): Promise<
 
 export async function updateMeeting(id: string, meetingData: Partial<Meeting>): Promise<Meeting> {
   try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
     const response = await axios.put<Meeting>(
       `${API_URL}/meetings/${id}`,
-      meetingData
+      meetingData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error: any) {

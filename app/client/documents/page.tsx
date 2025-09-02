@@ -24,68 +24,7 @@ import { useAuth } from "@/components/auth-provider"
 import { getWorks, getWorksByCustomerId, Work } from "@/services/works"
 import { useToast } from "@/hooks/use-toast"
 import { Customer, getCustomersByUserId } from "@/services/customers"
-
-// Datos de documentos de ejemplo
-const documents = [
-  {
-    id: 1,
-    name: "Torre Skyline - Planos de Planta",
-    project: "Torre Skyline",
-    category: "Planos",
-    type: "PDF",
-    size: "5.2 MB",
-    uploadDate: "2024-03-15",
-    status: "Aprobado",
-    requiresAction: false,
-  },
-  {
-    id: 2,
-    name: "Complejo Riverside - Propuesta de Presupuesto",
-    project: "Complejo Riverside",
-    category: "Presupuesto",
-    type: "XLSX",
-    size: "1.8 MB",
-    uploadDate: "2024-03-10",
-    status: "Pendiente de Aprobación",
-    requiresAction: true,
-  },
-  {
-    id: 3,
-    name: "Parque Oficinas Metro - Especificaciones de Materiales",
-    project: "Parque Oficinas Metro",
-    category: "Especificaciones",
-    type: "PDF",
-    size: "3.5 MB",
-    uploadDate: "2024-03-05",
-    status: "Aprobado",
-    requiresAction: false,
-  },
-  {
-    id: 4,
-    name: "Torre Skyline - Cronograma de Construcción",
-    project: "Torre Skyline",
-    category: "Cronograma",
-    type: "PDF",
-    size: "2.1 MB",
-    uploadDate: "2024-02-28",
-    status: "Pendiente de Aprobación",
-    requiresAction: true,
-  },
-  {
-    id: 5,
-    name: "Complejo Riverside - Maquetas de Diseño",
-    project: "Complejo Riverside",
-    category: "Diseño",
-    type: "ZIP",
-    size: "15.7 MB",
-    uploadDate: "2024-02-20",
-    status: "Aprobado",
-    requiresAction: false,
-  },
-]
-
-// Proyectos disponibles para el selector
-const availableProjects = ["Torre Skyline", "Complejo Riverside", "Parque Oficinas Metro"]
+import axios from "axios"
 
 // Categorías disponibles para el selector
 const availableCategories = [
@@ -99,9 +38,47 @@ const availableCategories = [
   "Informes",
 ]
 
+// Función para extraer documentos del cliente
+const extractDocumentsFromCustomer = (customers: Customer[]): any[] => {
+  if (!customers || customers.length === 0) return [];
+  
+  return customers.flatMap(customer => {
+    if (!customer.documents || !Array.isArray(customer.documents)) return [];
+    
+    return customer.documents.map((doc: any) => {
+      // Extraer el nombre del archivo de la URL
+      const fileName = doc.name || doc.url.split('/').pop() || 'Documento';
+      // Extraer la extensión para el tipo
+      const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'PDF';
+      
+      return {
+        id: doc._id,
+        name: fileName,
+        project: customer.name, // Usar el nombre del cliente como proyecto
+        category: 'Documento',
+        type: fileExtension,
+        size: 'N/A',
+        uploadDate: doc.uploadedAt ? new Date(doc.uploadedAt).toISOString().split('T')[0] : 'Desconocida',
+        status: 'Disponible',
+        requiresAction: false,
+        url: doc.url
+      };
+    });
+  });
+};
+
 export default function ClientDocumentsPage() {
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
+  const [token, setToken] = useState<string | null>(null)
+  
+  useEffect(() => {
+    // Get token from localStorage
+    const authToken = localStorage.getItem('token')
+    if (authToken) {
+      setToken(authToken)
+    }
+  }, [])
   const { user } = useAuth()
   const [works, setWorks] = useState<Work[]>([])
   const [worksError, setWorksError] = useState("")
@@ -112,7 +89,26 @@ export default function ClientDocumentsPage() {
   const [projectFilter, setProjectFilter] = useState("Todos")
   const [categoryFilter, setCategoryFilter] = useState("Todas")
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
-  const [documentsList, setDocumentsList] = useState(documents)
+  const [isUploading, setIsUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [documentsList, setDocumentsList] = useState<any[]>([])
+  const [availableProjects, setAvailableProjects] = useState<string[]>([])
+  
+  
+  // Actualizar documentos cuando cambian los clientes
+  useEffect(() => {
+    if (customers && customers.length > 0) {
+      const docs = extractDocumentsFromCustomer(customers);
+      setDocumentsList(docs);
+      
+      // Actualizar la lista de proyectos disponibles (nombres de clientes)
+      const customerNames = [...new Set(customers.map(customer => customer.name))];
+      setAvailableProjects(customerNames);
+    } else {
+      setDocumentsList([]);
+      setAvailableProjects([]);
+    }
+  }, [customers]);
 
     const fetchWorks = async () => {
       if (!user?.role) {
@@ -129,14 +125,13 @@ export default function ClientDocumentsPage() {
           data = response.works
         } else if (user.role === "client" || user.role === "customer" || user.role === "employee") {
           // Obtener solo los proyectos del cliente o empleado
-          if (!user.id) throw new Error("ID de cliente no válido")
-          const worksResult = await getWorksByCustomerId("678ac8bbcaa29603b2663cba")
-          // const worksResult = await getWorksByCustomerId(user.id)
-          data = worksResult as Work[]
+          if (!user._id) throw new Error("ID de cliente no válido")
+          const response = await getWorksByCustomerId(user._id)
+          data = response.works || []
         } else {
           throw new Error("Rol de usuario no soportado")
         }
-        setWorks(data.works)
+        setWorks(data)
       } catch (err: any) {
         if(err?.status === 400){
           setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
@@ -154,10 +149,17 @@ export default function ClientDocumentsPage() {
     async function fetchData() {
       if (!user?.id) return
       try {
-        const data = await getCustomersByUserId(user.id);
-        setCustomers(data);
+        const response = await getCustomersByUserId(user.id);
+        // Ensure we're setting the customers array correctly
+        if (Array.isArray(response)) {
+          setCustomers(response);
+        } else if (response && Array.isArray(response.customer)) {
+          setCustomers(response.customer);
+        } else {
+          setCustomers([]);
+        }
       } catch (err: any) {
-        setCustomersError(err.message ?? "Error al obtener customers");
+        setCustomersError(err?.message ?? "Error al obtener clientes");
       } finally {
         setLoadingCustomers(false);
       }
@@ -168,21 +170,33 @@ export default function ClientDocumentsPage() {
       fetchData()
     }, [user?.id, user?.role])
 
-  const [newDocument, setNewDocument] = useState({
+  const [newDocument, setNewDocument] = useState<{
+    name: string;
+    project: string;
+    category: string;
+    description: string;
+    file: File | null;
+  }>({
     name: "",
     project: "",
     category: "",
     description: "",
-    file: null as File | null,
+    file: null,
   })
 
-  const filteredDocuments = documentsList.filter(
-    (document) =>
-      (document.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        document.project.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (projectFilter === "Todos" || document.project === projectFilter) &&
-      (categoryFilter === "Todas" || document.category === categoryFilter),
-  )
+  const filteredDocuments = documentsList.filter((document) => {
+    if (!document) return false;
+    
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = searchTerm === '' || 
+      (document.name && document.name.toLowerCase().includes(searchLower)) ||
+      (document.project && document.project.toLowerCase().includes(searchLower));
+    
+    const matchesProject = projectFilter === "Todos" || document.project === projectFilter;
+    const matchesCategory = categoryFilter === "Todas" || document.category === categoryFilter;
+    
+    return matchesSearch && matchesProject && matchesCategory;
+  })
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -218,68 +232,194 @@ export default function ClientDocumentsPage() {
   }
 
   // Extraer proyectos únicos para el filtro
-  const projects = ["Todos", ...Array.from(new Set(documentsList.map((doc) => doc.project)))]
+  const projects = ["Todos", ...Array.from(new Set(documentsList.map((doc) => doc?.project).filter(Boolean)))]
 
   // Extraer categorías únicas para el filtro
-  const categories = ["Todas", ...Array.from(new Set(documentsList.map((doc) => doc.category)))]
+  const categories = ["Todas", ...Array.from(new Set(documentsList.map((doc) => doc?.category).filter(Boolean)))]
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setNewDocument({ ...newDocument, file: e.target.files[0] })
+      setNewDocument(prev => ({ ...prev, file: e.target.files![0] }));
     }
+  };
+
+  const handleDownload = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Network response was not ok');
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      toast({
+        title: "Descarga iniciada",
+        description: `El archivo ${fileName} se está descargando.`,
+      });
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el archivo. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  interface UploadResponse {
+    message: string;
+    document: {
+      fileName: string;
+      originalName: string;
+      mimeType: string;
+      size: number;
+      url: string;
+    };
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !user?._id) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    try {
+      // Define the return type for the upload promise
+      type UploadResult = {
+        name: string;
+        url: string;
+        size: number;
+        type: string;
+      };
+
+      const uploadPromises: Promise<UploadResult>[] = Array.from(files).map(async (file) => {
+        const uploadData = new FormData();
+        uploadData.append('file', file);
+        
+        // Use customerId for customers, otherwise use user._id
+        const userId = user?.role === 'customer' ? user.customerId : user?._id;
+        if (!userId) {
+          throw new Error('ID de usuario o cliente no disponible');
+        }
+        uploadData.append('userId', userId);
+
+        if (!token) {
+          throw new Error('No se encontró el token de autenticación');
+        }
+
+        // Create axios config with proper types
+        const config = {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          },
+          onUploadProgress: (progressEvent: { loaded: number; total: number }) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              setUploadProgress(percentCompleted);
+            }
+          }
+        };
+
+        try {
+          const response = await axios.post<UploadResponse>(
+            `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
+            uploadData,
+            config as any // Type assertion to bypass the type checking
+          );
+
+          if (response.data?.document?.url) {
+            return {
+              name: file.name,
+              url: response.data.document.url,
+              size: file.size,
+              type: file.type
+            };
+          }
+          throw new Error('No se pudo obtener la URL del archivo subido');
+        } catch (error) {
+          console.error(`Error uploading file ${file.name}:`, error);
+          throw error; // Re-throw to be caught by the outer catch
+        }
+      });
+
+      // Wait for all uploads to complete
+      const results = await Promise.allSettled(uploadPromises);
+      
+      // Check if any uploads failed
+      const failedUploads = results.filter(result => result.status === 'rejected');
+      if (failedUploads.length > 0) {
+        console.error('Algunos archivos no se pudieron subir:', failedUploads);
+        throw new Error(`No se pudieron subir ${failedUploads.length} de ${results.length} archivos`);
+      }
+      
+      // Refresh documents list
+      await fetchWorks();
+      
+      // Show success message
+      toast({
+        title: 'Éxito',
+        description: 'Documento(s) subido(s) correctamente',
+      });
+      
+      // Reset the file input
+      if (e.target) {
+        e.target.value = '';
+      }
+    } catch (error: any) {
+      console.error('Error uploading document:', error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || "Error al subir el documento",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleUploadDocument = () => {
-    if (!newDocument.name || !newDocument.project || !newDocument.category || !newDocument.file) {
-      alert("Por favor complete todos los campos requeridos")
-      return
+    const fileInput = document.getElementById('doc-file') as HTMLInputElement;
+    if (fileInput && fileInput.files && fileInput.files.length > 0) {
+      const event = { target: fileInput } as unknown as React.ChangeEvent<HTMLInputElement>;
+      handleFileUpload(event);
+    } else {
+      toast({
+        title: 'Error',
+        description: 'Por favor seleccione al menos un archivo',
+        variant: 'destructive',
+      });
     }
-
-    const id = documentsList.length > 0 ? Math.max(...documentsList.map((d) => d.id)) + 1 : 1
-    const now = new Date()
-
-    const newDoc = {
-      id,
-      name: newDocument.name,
-      project: newDocument.project,
-      category: newDocument.category,
-      type: newDocument.file.name.split(".").pop()?.toUpperCase() || "PDF",
-      size: `${(newDocument.file.size / (1024 * 1024)).toFixed(1)} MB`,
-      uploadDate: now.toISOString().split("T")[0],
-      status: "Pendiente de Aprobación",
-      requiresAction: false,
-    }
-
-    setDocumentsList([newDoc, ...documentsList])
-    setNewDocument({
-      name: "",
-      project: "",
-      category: "",
-      description: "",
-      file: null,
-    })
-    setIsUploadDialogOpen(false)
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Documentos</h1>
-          <p className="text-muted-foreground">Accede a todos los documentos relacionados con tus proyectos.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Documentos</h1>
+          <p className="text-sm text-muted-foreground">Gestiona y revisa los documentos de tus proyectos</p>
         </div>
         <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
           <DialogTrigger asChild>
             <Button>
-              <Upload className="mr-2 h-4 w-4" />
-              Subir Documento
+              <Upload className="mr-2 h-4 w-4" /> Subir Documento
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[550px]">
+          <DialogContent>
             <DialogHeader>
-              <DialogTitle>Subir Nuevo Documento</DialogTitle>
+              <DialogTitle>Subir nuevo documento</DialogTitle>
               <DialogDescription>
-                Sube un nuevo documento para compartir con el equipo de construcción.
+                Completa la información del documento que deseas subir.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -289,7 +429,7 @@ export default function ClientDocumentsPage() {
                   id="doc-name"
                   value={newDocument.name}
                   onChange={(e) => setNewDocument({ ...newDocument, name: e.target.value })}
-                  placeholder="Ej: Aprobación de Materiales"
+                  placeholder="Ej: Planos de planta baja"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -443,11 +583,21 @@ export default function ClientDocumentsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                        <a 
+                          href={document.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0"
+                        >
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">Ver</span>
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                        </a>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0"
+                          onClick={() => handleDownload(document.url, document.name)}
+                        >
                           <Download className="h-4 w-4" />
                           <span className="sr-only">Descargar</span>
                         </Button>

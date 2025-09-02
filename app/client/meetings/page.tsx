@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -18,72 +18,15 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { getMeetingsByUsername } from "@/services/meetings"
+import { useAuth } from "@/components/auth-provider"
 
-// Datos de reuniones de ejemplo
-const meetings = [
-  {
-    id: 1,
-    title: "Revisión de Diseño",
-    project: "Torre Skyline",
-    date: "2024-03-22",
-    time: "14:00",
-    duration: "1.5 horas",
-    type: "Presencial",
-    location: "Oficina del Proyecto",
-    description: "Revisión de los planos finales y aprobación de materiales.",
-    participants: ["Juan Pérez", "María López", "Carlos Rodríguez"],
-  },
-  {
-    id: 2,
-    title: "Discusión de Presupuesto",
-    project: "Complejo Riverside",
-    date: "2024-03-25",
-    time: "11:00",
-    duration: "1 hora",
-    type: "Videollamada",
-    location: "Zoom",
-    description: "Análisis de costos y ajustes al presupuesto inicial.",
-    participants: ["Ana Martínez", "Roberto Sánchez"],
-  },
-  {
-    id: 3,
-    title: "Actualización de Progreso",
-    project: "Parque Oficinas Metro",
-    date: "2024-03-28",
-    time: "15:30",
-    duration: "45 minutos",
-    type: "Videollamada",
-    location: "Microsoft Teams",
-    description: "Informe de avance de obra y planificación de próximas etapas.",
-    participants: ["Laura Gómez", "Pedro Díaz", "Sofía Ramírez"],
-  },
-  {
-    id: 4,
-    title: "Inspección de Obra",
-    project: "Torre Skyline",
-    date: "2024-04-05",
-    time: "10:00",
-    duration: "2 horas",
-    type: "Presencial",
-    location: "Sitio de Construcción",
-    description: "Visita al sitio para verificar avances y calidad de construcción.",
-    participants: ["Juan Pérez", "Carlos Rodríguez", "Elena Torres"],
-  },
-  {
-    id: 5,
-    title: "Selección de Acabados",
-    project: "Complejo Riverside",
-    date: "2024-04-10",
-    time: "16:00",
-    duration: "1.5 horas",
-    type: "Presencial",
-    location: "Showroom de Materiales",
-    description: "Selección final de acabados interiores y materiales decorativos.",
-    participants: ["Ana Martínez", "Laura Gómez", "Miguel Soto"],
-  },
-]
+import type { Meeting } from "@/services/meetings";
 
 export default function ClientMeetingsPage() {
+  const { user } = useAuth()
+  const [meetings, setMeetings] = useState<Array<Partial<Meeting>>>([])
+  const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [projectFilter, setProjectFilter] = useState("Todos")
   const [typeFilter, setTypeFilter] = useState("Todos")
@@ -96,15 +39,36 @@ export default function ClientMeetingsPage() {
     description: "",
   })
 
-  const filteredMeetings = meetings.filter(
-    (meeting) =>
-      (meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        meeting.project.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (projectFilter === "Todos" || meeting.project === projectFilter) &&
-      (typeFilter === "Todos" || meeting.type === typeFilter),
-  )
+  useEffect(() => {
+    const fetchMeetings = async () => {
+      try {
+        setLoading(true);
+        const response = await getMeetingsByUsername(user?.email || "");
+        // Ensure we're only storing the meetings array, not the entire response
+        if (response && response.meetings) {
+          setMeetings(response.meetings);
+        }
+      } catch (error) {
+        console.error("Error al obtener las reuniones:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchMeetings();
+  }, [user?.email])
 
-  const formatDate = (dateString: string) => {
+  const filteredMeetings = meetings.filter((meeting) => {
+    const titleMatch = meeting.title?.toLowerCase().includes(searchTerm.toLowerCase());
+    const projectMatch = typeof meeting.project === 'object' && 
+                        meeting.project?.title?.toLowerCase().includes(searchTerm.toLowerCase());
+    const projectFilterMatch = projectFilter === "Todos" || 
+                             (typeof meeting.project === 'object' && meeting.project?.title === projectFilter);
+    const typeFilterMatch = typeFilter === "Todos" || meeting.meetingType === typeFilter;
+    
+    return (titleMatch || projectMatch) && projectFilterMatch && typeFilterMatch;
+  })
+
+  const formatDate = (dateString: string ) => {
     const date = new Date(dateString)
     return new Intl.DateTimeFormat("es-ES", {
       year: "numeric",
@@ -114,15 +78,19 @@ export default function ClientMeetingsPage() {
   }
 
   // Extraer proyectos únicos para el filtro
-  const projects = ["Todos", ...Array.from(new Set(meetings.map((meeting) => meeting.project)))]
+  const projects = ["Todos", ...Array.from(new Set(
+    meetings
+      .map(meeting => (typeof meeting.project === 'object' && meeting.project?.title) || '')
+      .filter(Boolean)
+  ))]
 
   // Tipos de reuniones para el filtro
   const meetingTypes = ["Todos", "Presencial", "Videollamada"]
 
   const handleRequestMeeting = () => {
     // Aquí iría la lógica para enviar la solicitud de reunión
+    // Por ahora, solo cerramos el diálogo y reiniciamos el formulario
     setIsDialogOpen(false)
-    // Reiniciar el formulario
     setNewMeeting({
       project: "",
       title: "",
@@ -278,55 +246,54 @@ export default function ClientMeetingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMeetings.map((meeting) => (
-                  <TableRow key={meeting.id}>
-                    <TableCell className="font-medium">
-                      <div>{meeting.title}</div>
-                      <div className="text-xs text-muted-foreground">{meeting.description.substring(0, 50)}...</div>
-                    </TableCell>
-                    <TableCell>{meeting.project}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                          <span>{formatDate(meeting.date)}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          <span>
-                            {meeting.time} ({meeting.duration})
-                          </span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="flex items-center gap-1">
-                        {meeting.type === "Videollamada" ? (
-                          <Video className="h-3 w-3 text-muted-foreground" />
-                        ) : (
-                          <Calendar className="h-3 w-3 text-muted-foreground" />
-                        )}
-                        <span>{meeting.type}</span>
-                        <span className="text-xs text-muted-foreground">({meeting.location})</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {meeting.type === "Videollamada" ? (
-                        <Button size="sm">Unirse</Button>
-                      ) : (
-                        <Button size="sm" variant="outline">
-                          Detalles
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filteredMeetings.length === 0 && (
+                {filteredMeetings.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                      No se encontraron reuniones. Intenta ajustar tu búsqueda o solicita una nueva reunión.
+                    <TableCell colSpan={5} className="text-center py-8">
+                      <div className="flex flex-col items-center justify-center space-y-2">
+                        <Calendar className="h-12 w-12 text-muted-foreground" />
+                        <p className="text-lg font-medium">No hay reuniones programadas</p>
+                        <p className="text-sm text-muted-foreground">
+                          No se encontraron reuniones para mostrar en este momento.
+                        </p>
+                      </div>
                     </TableCell>
                   </TableRow>
+                ) : (
+                  filteredMeetings.map((meeting) => (
+                    <TableRow key={meeting._id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center space-x-2">
+                          <div className="flex-shrink-0">
+                            {meeting.meetingType === "Videollamada" ? (
+                              <Video className="h-5 w-5 text-blue-500" />
+                            ) : (
+                              <Calendar className="h-5 w-5 text-green-500" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium">{meeting.title}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {typeof meeting.project === 'object' ? meeting.project.title : 'Sin proyecto'}
+                            </div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>{formatDate(meeting?.date || '')}</TableCell>
+                      <TableCell>{meeting.time}</TableCell>
+                      <TableCell>{meeting.duration}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                            meeting.meetingType === "Videollamada"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-green-100 text-green-800"
+                          }`}
+                        >
+                          {meeting.meetingType}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>

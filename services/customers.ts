@@ -84,3 +84,10 @@ export async function getCustomersByUserId(userId?: string): Promise<{message: s
   const { data } = await axios.get<{message: string, customer: Customer[]}>(`${API_URL}/getcustomersbyid/${userId}`);
   return data;
 }
+
+export async function updateCustomer(customerId: string, customerData: Partial<Customer>): Promise<Customer> {
+  if (!customerId) throw new Error("ID de cliente inválido");
+  
+  const { data } = await axios.put<Customer>(`${API_URL}/updateCustomer/${customerId}`, customerData);
+  return data;
+}

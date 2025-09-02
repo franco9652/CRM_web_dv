@@ -9,11 +9,12 @@ export interface LoginResponse {
   role: string;
   supabaseUserId?: string;
   message?: string;
+  customerId?: string;
   user?: {
     id: string;
     name: string;
     email: string;
-    role: "admin" | "client";
+    role: "admin" | "client" | "customer";
     _id?: string;
   };
 }

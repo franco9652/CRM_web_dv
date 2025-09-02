@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -33,7 +33,10 @@ import {
   deleteMeeting, 
   type Meeting 
 } from "@/services/meetings"
+import { getWorksByCustomerId, type WorksByCustomerResponse, type Work } from "@/services/works"
+import { getAllCustomers, type Customer } from "@/services/customers"
 import { useAuth } from "@/components/auth-provider"
+import { useToast } from "@/hooks/use-toast"
 
 // Local interface for the meeting form data, aligned with the Meeting interface
 type MeetingFormData = Omit<Meeting, '_id' | 'createdAt' | 'updatedAt' | 'date'> & {
@@ -45,6 +48,8 @@ export default function CalendarPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [customers, setCustomers] = useState<Meeting['customer'][]>([]);
   const [projects, setProjects] = useState<Meeting['project'][]>([]);
+  const [customerProjects, setCustomerProjects] = useState<Array<{_id: string; name: string}>>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
   
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -77,24 +82,32 @@ export default function CalendarPage() {
   };
   const [newMeeting, setNewMeeting] = useState<MeetingFormData>(initialFormState);
 
-  // Fetch meetings and derive customers/projects on component mount
+  // Fetch all customers
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const allCustomers = await getAllCustomers();
+      
+      // Map to the expected format for the calendar
+      setCustomers(allCustomers.map(customer => ({
+        _id: customer._id,
+        name: customer.name,
+        email: customer.email || '',
+        phone: customer.phone || (customer as any).contactNumber || '',
+        address: customer.address || ''
+      })));
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    }
+  }, []);
+
+  // Fetch meetings and projects on component mount
   useEffect(() => {
     const fetchAndProcessMeetings = async () => {
       try {
         setLoading(true);
         const response = await getAllMeetings();
         const fetchedMeetings = response.meetings || [];
-        console.log('response: ', response)
         setMeetings(fetchedMeetings);
-
-        // Derive unique customers from meetings
-        const uniqueCustomers = new Map<string, Meeting['customer']>();
-        fetchedMeetings.forEach(meeting => {
-          if (meeting.customer?._id) {
-            uniqueCustomers.set(meeting.customer._id, meeting.customer);
-          }
-        });
-        setCustomers(Array.from(uniqueCustomers.values()));
         
         // Derive unique projects from meetings
         const uniqueProjects = new Map<string, Meeting['project']>();
@@ -112,8 +125,9 @@ export default function CalendarPage() {
       }
     };
 
+    fetchCustomers();
     fetchAndProcessMeetings();
-  }, []);
+  }, [fetchCustomers]);
   
   // Filter meetings based on search term, customer, and meeting type
   const filteredMeetings = meetings.filter((meeting) => {
@@ -156,7 +170,11 @@ export default function CalendarPage() {
   // Handle adding a new meeting
   const handleAddMeeting = async () => {
     if (!newMeeting.customer._id || !newMeeting.project._id) {
-      console.error('Customer and project are required');
+      toast({
+        title: "Error",
+        description: "Por favor selecciona un cliente y un proyecto.",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -167,14 +185,27 @@ export default function CalendarPage() {
       await createMeeting(meetingDataForApi);
       await fetchMeetingsAndUpdateState();
       
+      toast({
+        title: "Reunión creada",
+        description: "La reunión se ha creado correctamente.",
+        variant: "default",
+      });
+      
       resetForm();
       setIsAddDialogOpen(false);
     } catch (error) {
       console.error('Error adding meeting:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo crear la reunión. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
     }
   }
 
   // Handle editing a meeting
+  const { toast } = useToast();
+  
   const handleEditMeeting = async () => {
     if (!selectedMeeting?._id) return;
 
@@ -184,8 +215,19 @@ export default function CalendarPage() {
       
       resetForm();
       setIsEditDialogOpen(false);
+      
+      toast({
+        title: "Reunión actualizada",
+        description: "La reunión se ha actualizado correctamente.",
+        variant: "default",
+      });
     } catch (error) {
       console.error('Error updating meeting:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la reunión. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
     }
   }
 
@@ -208,16 +250,108 @@ export default function CalendarPage() {
   const resetForm = () => {
     setNewMeeting(initialFormState);
     setSelectedMeeting(null);
+    setCustomerProjects([]);
   }
 
+  // Fetch projects when customer changes
+  const handleCustomerChange = async (customerId: string) => {
+    if (!customerId) {
+      setCustomerProjects([]);
+      setNewMeeting(prev => ({ ...prev, project: { _id: "", title: "" } }));
+      return;
+    }
+
+    setLoadingProjects(true);
+    try {
+      const response = await getWorksByCustomerId(customerId) as WorksByCustomerResponse;
+      const projects = response?.works?.map(work => ({
+        _id: work._id,
+        name: work.name
+      })) || [];
+      
+      setCustomerProjects(projects);
+      
+      // Update customer info from the response if available
+      const selectedCustomer = response?.customerInfo ? {
+        _id: response.customerInfo.id,
+        name: response.customerInfo.name,
+        email: response.customerInfo.email
+      } : customers.find(c => c._id === customerId);
+      
+      // Reset selected project when customer changes
+      setNewMeeting(prev => ({ 
+        ...prev, 
+        project: { _id: "", title: "" },
+        customer: selectedCustomer || prev.customer
+      }));
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los proyectos del cliente.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
   // Handle opening the edit dialog
-  const openEditDialog = (meeting: Meeting) => {
+  const openEditDialog = async (meeting: Meeting) => {
     setSelectedMeeting(meeting);
-    setNewMeeting({
-      ...initialFormState, // Start with initial state to ensure all fields are present
-      ...meeting,
-      date: new Date(meeting.date), // Ensure date is a Date object
-    });
+    
+    // If there's a customer, load their projects first
+    if (meeting.customer?._id) {
+      setLoadingProjects(true);
+      try {
+        // Fetch projects for the customer
+        const response = await getWorksByCustomerId(meeting.customer._id);
+        const projects = response.works.map(work => ({
+          _id: work._id,
+          name: work.name
+        }));
+        
+        setCustomerProjects(projects);
+        
+        // Find the current project in the fetched projects
+        const currentProject = projects.find(p => p._id === meeting.project?._id);
+        
+        // Update the form with the meeting data and ensure the project is set correctly
+        setNewMeeting({
+          ...initialFormState,
+          ...meeting,
+          date: new Date(meeting.date),
+          project: currentProject ? {
+            _id: currentProject._id,
+            title: currentProject.name
+          } : { _id: "", title: "" }
+        });
+        
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        toast({
+          title: "Error",
+          description: "No se pudieron cargar los proyectos del cliente.",
+          variant: "destructive",
+        });
+        
+        // Still set the meeting data even if projects fail to load
+        setNewMeeting({
+          ...initialFormState,
+          ...meeting,
+          date: new Date(meeting.date)
+        });
+      } finally {
+        setLoadingProjects(false);
+      }
+    } else {
+      // If no customer ID, just set the meeting data
+      setNewMeeting({
+        ...initialFormState,
+        ...meeting,
+        date: new Date(meeting.date)
+      });
+    }
     setIsEditDialogOpen(true);
   };
 
@@ -262,32 +396,55 @@ export default function CalendarPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="customer">Cliente</Label>
-                <Select value={newMeeting.customer._id} onValueChange={(value) => {
-                  const selectedCustomer = customers.find(c => c._id === value);
-                  if (selectedCustomer) {
-                    setNewMeeting(prev => ({ ...prev, customer: selectedCustomer, project: { _id: "", title: "" } }));
-                  }
-                }}>
-                  <SelectTrigger id="customer"><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
+                <Select 
+                  value={newMeeting.customer._id} 
+                  onValueChange={handleCustomerChange}
+                >
+                  <SelectTrigger id="customer">
+                    <SelectValue placeholder="Seleccionar cliente" />
+                  </SelectTrigger>
                   <SelectContent>
                     {customers.map((customer) => (
-                      <SelectItem key={customer._id} value={customer._id}>{customer.name}</SelectItem>
+                      <SelectItem key={customer._id} value={customer._id}>
+                        {customer.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="project">Proyecto</Label>
-                <Select value={newMeeting.project._id} onValueChange={(value) => {
-                  const selectedProject = getProjectsForCustomer(newMeeting.customer._id).find(p => p._id === value);
-                  if (selectedProject) setNewMeeting({ ...newMeeting, project: selectedProject });
-                }} disabled={!newMeeting.customer._id}>
+                <Select 
+                  value={newMeeting.project._id} 
+                  onValueChange={(value) => {
+                    const selectedProject = customerProjects.find(p => p._id === value);
+                    if (selectedProject) {
+                      setNewMeeting(prev => ({
+                        ...prev, 
+                        project: { _id: selectedProject._id, title: selectedProject.name || '' }
+                      }));
+                    }
+                  }} 
+                  disabled={!newMeeting.customer._id || loadingProjects}
+                >
                   <SelectTrigger id="project">
-                    <SelectValue placeholder={!newMeeting.customer._id ? "Seleccione un cliente primero" : "Seleccionar proyecto"} />
+                    {loadingProjects ? (
+                      <span className="text-muted-foreground">Cargando proyectos...</span>
+                    ) : !newMeeting.customer._id ? (
+                      <span className="text-muted-foreground">Seleccione un cliente primero</span>
+                    ) : customerProjects.length === 0 ? (
+                      <span className="text-muted-foreground">No hay proyectos disponibles</span>
+                    ) : (
+                      <SelectValue placeholder="Seleccionar proyecto" />
+                    )}
                   </SelectTrigger>
                   <SelectContent>
-                    {getProjectsForCustomer(newMeeting.customer._id).map((project) => (
-                      <SelectItem key={project._id} value={project._id}>{project.title}</SelectItem>
+                    {Array.isArray(customerProjects) && customerProjects.map((project) => (
+                      project && project._id ? (
+                        <SelectItem key={project._id} value={project._id}>
+                          {project.name || 'Sin nombre'}
+                        </SelectItem>
+                      ) : null
                     ))}
                   </SelectContent>
                 </Select>
@@ -379,7 +536,6 @@ export default function CalendarPage() {
                   <TableHead>Proyecto / Cliente</TableHead>
                   <TableHead>Fecha y Hora</TableHead>
                   <TableHead className="hidden md:table-cell">Tipo</TableHead>
-                  <TableHead className="hidden md:table-cell">Participantes</TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -425,15 +581,6 @@ export default function CalendarPage() {
                             <span className="truncate max-w-[150px]">{meeting.meetingLink}</span>
                           </div>
                         ) : ( meeting.address )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="flex items-center gap-1">
-                        <Users className="h-3 w-3 text-muted-foreground" />
-                        <span>{meeting.participants?.length ?? 0}</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1 truncate max-w-[150px]">
-                        {meeting.participants?.join(", ")}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -541,12 +688,37 @@ export default function CalendarPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-project">Proyecto</Label>
-                <Select value={newMeeting.project._id} onValueChange={(value) => {
-                  const selectedProject = getProjectsForCustomer(newMeeting.customer._id).find(p => p._id === value);
-                  if (selectedProject) setNewMeeting({ ...newMeeting, project: selectedProject });
-                }} disabled={!newMeeting.customer._id}>
-                  <SelectTrigger id="edit-project"><SelectValue placeholder={!newMeeting.customer._id ? "Seleccione un cliente primero" : "Seleccionar proyecto"} /></SelectTrigger>
-                  <SelectContent>{getProjectsForCustomer(newMeeting.customer._id).map((project) => (<SelectItem key={project._id} value={project._id}>{project.title}</SelectItem>))}</SelectContent>
+                <Select 
+                  value={newMeeting.project._id} 
+                  onValueChange={(value) => {
+                    const selectedProject = customerProjects.find(p => p._id === value);
+                    if (selectedProject) {
+                      setNewMeeting(prev => ({
+                        ...prev, 
+                        project: { _id: selectedProject._id, title: selectedProject.name }
+                      }));
+                    }
+                  }} 
+                  disabled={!newMeeting.customer._id || loadingProjects}
+                >
+                  <SelectTrigger id="edit-project">
+                    {loadingProjects ? (
+                      <span className="text-muted-foreground">Cargando proyectos...</span>
+                    ) : !newMeeting.customer._id ? (
+                      <span className="text-muted-foreground">Seleccione un cliente primero</span>
+                    ) : customerProjects.length === 0 ? (
+                      <span className="text-muted-foreground">No hay proyectos disponibles</span>
+                    ) : (
+                      <SelectValue placeholder="Seleccionar proyecto" />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customerProjects.map((project) => (
+                      <SelectItem key={project._id} value={project._id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">

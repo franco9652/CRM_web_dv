@@ -29,17 +29,6 @@ export default function ClientSidebar() {
         <div className="flex-1 overflow-auto py-2">
           <nav className="grid items-start px-2 text-sm font-medium">
             <Link
-              href="/client/dashboard"
-              className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
-                isActive("/client/dashboard")
-                  ? "bg-muted text-primary"
-                  : "text-muted-foreground hover:bg-muted hover:text-primary"
-              }`}
-            >
-              <LayoutDashboard className="h-4 w-4" />
-              {!collapsed && <span>Dashboard</span>}
-            </Link>
-            <Link
               href="/client/projects"
               className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
                 isActive("/client/projects")

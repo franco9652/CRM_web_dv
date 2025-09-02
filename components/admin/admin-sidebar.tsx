@@ -9,6 +9,7 @@ import {
   Calendar,
   ChevronLeft,
   ChevronRight,
+  FileBadge,
   FileText,
   LayoutDashboard,
   Settings,
@@ -69,6 +70,17 @@ export default function AdminSidebar() {
             >
               <Users className="h-4 w-4" />
               {!collapsed && <span>Clientes</span>}
+            </Link>
+            <Link
+              href="/admin/budgets"
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
+                isActive("/admin/budgets")
+                  ? "bg-muted text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-primary"
+              }`}
+            >
+              <FileBadge className="h-4 w-4" />
+              {!collapsed && <span>Presupuestos</span>}
             </Link>
             <Link
               href="/admin/documents"
