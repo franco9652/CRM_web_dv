@@ -8,13 +8,43 @@ type ApiError = {
   };
 };
 
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
 // Fuerza el endpoint de producción siempre, para desarrollo y producción
 const API_URL = "https://crmdbsoft.zeabur.app";
 
 export interface Budget {
   _id: string;
   workId: string;
+  workId: string;
   customerId: string;
+  customerName: string;
+  email: string;
+  projectAddress: string;
+  projectType: string;
+  m2: string;
+  levels: string;
+  rooms: string;
+  materials: string[];
+  demolition: boolean;
+  approvals: string[];
+  budgetDate: string;
+  subcontractors: string[];
+  startDate: string;
+  endDate: string;
+  estimatedBudget: number;
+  currency: string;
+  advancePayment: boolean;
+  documentation: string[];
+  status: string;
+  ID: number;
+  __v: number;
   customerName: string;
   email: string;
   projectAddress: string;
@@ -39,6 +69,7 @@ export interface Budget {
   [key: string]: any;
 }
 
+export type BudgetsResponse = Budget[];
 export type BudgetsResponse = Budget[];
 
 /**
