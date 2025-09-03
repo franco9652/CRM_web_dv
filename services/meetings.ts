@@ -14,6 +14,9 @@ export interface Meeting {
   project: {
     _id: string;
     title: string;
+    name: string;
+    ID: string;
+    userId: string[];
   };
   date: Date | string;
   time: string;

@@ -41,14 +41,43 @@ import { useToast } from "@/hooks/use-toast"
 // Local interface for the meeting form data, aligned with the Meeting interface
 type MeetingFormData = Omit<Meeting, '_id' | 'createdAt' | 'updatedAt' | 'date'> & {
   date: Date;
+  project: {
+    _id: string;
+    title: string;
+    name: string;
+    ID: string;
+    userId: string[];
+  };
+  customer: {
+    _id: string;
+    name: string;
+    email: string;
+  };
 };
 
 export default function CalendarPage() {
   const { user } = useAuth();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [customers, setCustomers] = useState<Meeting['customer'][]>([]);
-  const [projects, setProjects] = useState<Meeting['project'][]>([]);
-  const [customerProjects, setCustomerProjects] = useState<Array<{_id: string; name: string}>>([]);
+  const [customers, setCustomers] = useState<Array<{
+    _id: string;
+    name: string;
+    email: string;
+  }>>([]);
+  
+  const [projects, setProjects] = useState<Array<{
+    _id: string;
+    title: string;
+    name: string;
+    ID: string;
+    userId: string[];
+  }>>([]);
+  const [customerProjects, setCustomerProjects] = useState<Array<{
+    _id: string;
+    name: string;
+    title: string;
+    ID: string;
+    userId: string[];
+  }>>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   
   const [loading, setLoading] = useState(true);
@@ -67,20 +96,27 @@ export default function CalendarPage() {
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
   // Form state for adding/editing a meeting
-  const initialFormState: MeetingFormData = {
-    title: "",
-    customer: { _id: "", name: "", email: "" },
-    project: { _id: "", title: "" },
+  const [newMeeting, setNewMeeting] = useState<MeetingFormData>({
+    title: '',
+    customer: {
+      _id: '',
+      name: '',
+      email: ''
+    },
+    project: {
+      _id: '',
+      title: '',
+      name: '',
+      ID: '',
+      userId: []
+    },
     date: new Date(),
-    time: "",
-    duration: "1 hora",
-    meetingType: "Videollamada",
-    meetingLink: "",
-    address: "",
-    description: "",
-    participants: [],
-  };
-  const [newMeeting, setNewMeeting] = useState<MeetingFormData>(initialFormState);
+    time: '',
+    duration: '',
+    meetingType: 'Presencial',
+    description: '',
+    status: 'scheduled'
+  });
 
   // Fetch all customers
   const fetchCustomers = useCallback(async () => {
@@ -248,51 +284,73 @@ export default function CalendarPage() {
 
   // Reset the form to initial state
   const resetForm = () => {
-    setNewMeeting(initialFormState);
+    setNewMeeting({
+      title: '',
+      customer: {
+        _id: '',
+        name: '',
+        email: ''
+      },
+      project: {
+        _id: '',
+        title: '',
+        name: '',
+        ID: '',
+        userId: []
+      },
+      date: new Date(),
+      time: '',
+      duration: '',
+      meetingType: 'Presencial',
+      description: '',
+      status: 'scheduled'
+    });
     setSelectedMeeting(null);
     setCustomerProjects([]);
   }
 
   // Fetch projects when customer changes
-  const handleCustomerChange = async (customerId: string) => {
-    if (!customerId) {
-      setCustomerProjects([]);
-      setNewMeeting(prev => ({ ...prev, project: { _id: "", title: "" } }));
-      return;
-    }
-
+  const fetchCustomerProjects = async (customerId: string) => {
+    if (!customerId) return;
     setLoadingProjects(true);
     try {
-      const response = await getWorksByCustomerId(customerId) as WorksByCustomerResponse;
-      const projects = response?.works?.map(work => ({
-        _id: work._id,
-        name: work.name
-      })) || [];
-      
-      setCustomerProjects(projects);
-      
-      // Update customer info from the response if available
-      const selectedCustomer = response?.customerInfo ? {
-        _id: response.customerInfo.id,
-        name: response.customerInfo.name,
-        email: response.customerInfo.email
-      } : customers.find(c => c._id === customerId);
-      
-      // Reset selected project when customer changes
-      setNewMeeting(prev => ({ 
-        ...prev, 
-        project: { _id: "", title: "" },
-        customer: selectedCustomer || prev.customer
-      }));
+      const response = await getWorksByCustomerId(customerId);
+      if (response && response.works) {
+        setCustomerProjects(response.works.map(work => ({
+          _id: work._id,
+          name: work.name || work.title || 'Sin nombre',
+          title: work.title || work.name || 'Sin título',
+          ID: work.ID || '',
+          userId: work.userId || []
+        })));
+      }
     } catch (error) {
       console.error('Error fetching projects:', error);
-      toast({
-        title: "Error",
-        description: "No se pudieron cargar los proyectos del cliente.",
-        variant: "destructive",
-      });
+      setCustomerProjects([]);
     } finally {
       setLoadingProjects(false);
+    }
+  };
+
+  const handleCustomerChange = (customerId: string) => {
+    const selectedCustomer = customers.find(c => c._id === customerId);
+    if (selectedCustomer) {
+      setNewMeeting(prev => ({
+        ...prev,
+        customer: {
+          _id: selectedCustomer._id,
+          name: selectedCustomer.name,
+          email: selectedCustomer.email || ''
+        },
+        project: {
+          _id: '',
+          title: '',
+          name: '',
+          ID: '',
+          userId: []
+        }
+      }));
+      fetchCustomerProjects(customerId);
     }
   };
 
@@ -308,7 +366,10 @@ export default function CalendarPage() {
         const response = await getWorksByCustomerId(meeting.customer._id);
         const projects = response.works.map(work => ({
           _id: work._id,
-          name: work.name
+          name: work.name || work.title || 'Sin nombre',
+          title: work.title || work.name || 'Sin título',
+          ID: work.ID || '',
+          userId: work.userId || []
         }));
         
         setCustomerProjects(projects);
@@ -317,14 +378,33 @@ export default function CalendarPage() {
         const currentProject = projects.find(p => p._id === meeting.project?._id);
         
         // Update the form with the meeting data and ensure the project is set correctly
-        setNewMeeting({
-          ...initialFormState,
-          ...meeting,
-          date: new Date(meeting.date),
+setNewMeeting({
+          title: meeting.title,
+          customer: {
+            _id: meeting.customer._id,
+            name: meeting.customer.name,
+            email: meeting.customer.email || ''
+          },
           project: currentProject ? {
             _id: currentProject._id,
-            title: currentProject.name
-          } : { _id: "", title: "" }
+            title: currentProject.title || currentProject.name || 'Sin título',
+            name: currentProject.name || currentProject.title || 'Sin nombre',
+            ID: currentProject.ID || '',
+            userId: currentProject.userId || []
+          } : { _id: "", title: "", name: "", ID: "", userId: [] },
+          date: new Date(meeting.date),
+          time: meeting.time || '',
+          duration: meeting.duration || '',
+          meetingType: meeting.meetingType || 'Presencial',
+          description: meeting.description || '',
+          status: meeting.status || 'scheduled',
+          meetingLink: meeting.meetingLink || '',
+          address: meeting.address || '',
+          participants: meeting.participants || [],
+          location: meeting.location || '',
+          link: meeting.link || '',
+          type: meeting.type || '',
+          attendees: meeting.attendees
         });
         
       } catch (error) {
@@ -336,10 +416,33 @@ export default function CalendarPage() {
         });
         
         // Still set the meeting data even if projects fail to load
-        setNewMeeting({
-          ...initialFormState,
-          ...meeting,
-          date: new Date(meeting.date)
+setNewMeeting({
+          title: meeting.title,
+          customer: {
+            _id: meeting.customer._id,
+            name: meeting.customer.name,
+            email: meeting.customer.email || ''
+          },
+          project: meeting.project || {
+            _id: "",
+            title: "",
+            name: "",
+            ID: "",
+            userId: []
+          },
+          date: new Date(meeting.date),
+          time: meeting.time || '',
+          duration: meeting.duration || '',
+          meetingType: meeting.meetingType || 'Presencial',
+          description: meeting.description || '',
+          status: meeting.status || 'scheduled',
+          meetingLink: meeting.meetingLink || '',
+          address: meeting.address || '',
+          participants: meeting.participants || [],
+          location: meeting.location || '',
+          link: meeting.link || '',
+          type: meeting.type || '',
+          attendees: meeting.attendees
         });
       } finally {
         setLoadingProjects(false);
@@ -347,9 +450,32 @@ export default function CalendarPage() {
     } else {
       // If no customer ID, just set the meeting data
       setNewMeeting({
-        ...initialFormState,
-        ...meeting,
-        date: new Date(meeting.date)
+        title: meeting.title,
+        customer: {
+          _id: meeting.customer._id,
+          name: meeting.customer.name,
+          email: meeting.customer.email || ''
+        },
+        project: meeting.project || {
+          _id: "",
+          title: "",
+          name: "",
+          ID: "",
+          userId: []
+        },
+        date: new Date(meeting.date),
+        time: meeting.time || '',
+        duration: meeting.duration || '',
+        meetingType: meeting.meetingType || 'Presencial',
+        description: meeting.description || '',
+        status: meeting.status || 'scheduled',
+        meetingLink: meeting.meetingLink || '',
+        address: meeting.address || '',
+        participants: meeting.participants || [],
+        location: meeting.location || '',
+        link: meeting.link || '',
+        type: meeting.type || '',
+        attendees: meeting.attendees
       });
     }
     setIsEditDialogOpen(true);
@@ -421,7 +547,13 @@ export default function CalendarPage() {
                     if (selectedProject) {
                       setNewMeeting(prev => ({
                         ...prev, 
-                        project: { _id: selectedProject._id, title: selectedProject.name || '' }
+                        project: { 
+                          _id: selectedProject._id, 
+                          title: selectedProject.title || selectedProject.name || 'Sin título',
+                          name: selectedProject.name || selectedProject.title || 'Sin nombre',
+                          ID: selectedProject.ID || '',
+                          userId: selectedProject.userId || []
+                        }
                       }));
                     }
                   }} 

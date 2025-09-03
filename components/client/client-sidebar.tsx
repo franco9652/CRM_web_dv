@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Building2, Calendar, ChevronLeft, ChevronRight, FileText, LayoutDashboard, Settings } from "lucide-react"
+import { Building2, Calendar, ChevronLeft, ChevronRight, FileBadge, FileText, LayoutDashboard, Settings } from "lucide-react"
 
 export default function ClientSidebar() {
   const pathname = usePathname()
@@ -49,6 +49,17 @@ export default function ClientSidebar() {
             >
               <FileText className="h-4 w-4" />
               {!collapsed && <span>Documentos</span>}
+            </Link>
+            <Link
+              href="/client/budgets"
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
+                isActive("/client/budgets")
+                  ? "bg-muted text-primary"
+                  : "text-muted-foreground hover:bg-muted hover:text-primary"
+              }`}
+            >
+              <FileBadge className="h-4 w-4" />
+              {!collapsed && <span>Presupuestos</span>}
             </Link>
             <Link
               href="/client/meetings"

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -19,6 +19,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { getMeetingsByUsername } from "@/services/meetings"
+import { getWorksByCustomerId } from "@/services/works"
 import { useAuth } from "@/components/auth-provider"
 
 import type { Meeting } from "@/services/meetings";
@@ -38,13 +39,33 @@ export default function ClientMeetingsPage() {
     time: "",
     description: "",
   })
+  const [projects, setProjects] = useState<Array<{id: string, name: string}>>([])
+  const [loadingProjects, setLoadingProjects] = useState(false)
+
+  const fetchProjects = useCallback(async () => {
+    if (!user?.id) return;
+    
+    try {
+      setLoadingProjects(true);
+      const response = await getWorksByCustomerId(user.id);
+      if (response && response.works) {
+        setProjects(response.works.map(work => ({
+          id: work._id,
+          name: work.name
+        })));
+      }
+    } catch (error) {
+      console.error("Error al obtener los proyectos:", error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     const fetchMeetings = async () => {
       try {
         setLoading(true);
         const response = await getMeetingsByUsername(user?.email || "");
-        // Ensure we're only storing the meetings array, not the entire response
         if (response && response.meetings) {
           setMeetings(response.meetings);
         }
@@ -54,21 +75,23 @@ export default function ClientMeetingsPage() {
         setLoading(false);
       }
     };
+    
     fetchMeetings();
-  }, [user?.email])
+    fetchProjects();
+  }, [user?.email, fetchProjects])
 
   const filteredMeetings = meetings.filter((meeting) => {
     const titleMatch = meeting.title?.toLowerCase().includes(searchTerm.toLowerCase());
-    const projectMatch = typeof meeting.project === 'object' && 
-                        meeting.project?.title?.toLowerCase().includes(searchTerm.toLowerCase());
+    const projectMatch = meeting.project && 
+                        meeting.project.name?.toLowerCase().includes(searchTerm.toLowerCase());
     const projectFilterMatch = projectFilter === "Todos" || 
-                             (typeof meeting.project === 'object' && meeting.project?.title === projectFilter);
+                             (meeting.project && meeting.project._id === projectFilter);
     const typeFilterMatch = typeFilter === "Todos" || meeting.meetingType === typeFilter;
     
     return (titleMatch || projectMatch) && projectFilterMatch && typeFilterMatch;
   })
 
-  const formatDate = (dateString: string ) => {
+  const formatDate = (dateString: string | Date ) => {
     const date = new Date(dateString)
     return new Intl.DateTimeFormat("es-ES", {
       year: "numeric",
@@ -77,8 +100,8 @@ export default function ClientMeetingsPage() {
     }).format(date)
   }
 
-  // Extraer proyectos únicos para el filtro
-  const projects = ["Todos", ...Array.from(new Set(
+  // Proyectos para el filtro (incluye "Todos" y los proyectos existentes en las reuniones)
+  const projectOptions = ["Todos", ...Array.from(new Set(
     meetings
       .map(meeting => (typeof meeting.project === 'object' && meeting.project?.title) || '')
       .filter(Boolean)
@@ -132,13 +155,17 @@ export default function ClientMeetingsPage() {
                     <SelectValue placeholder="Seleccionar proyecto" />
                   </SelectTrigger>
                   <SelectContent>
-                    {projects
-                      .filter((p) => p !== "Todos")
-                      .map((project) => (
-                        <SelectItem key={project} value={project}>
-                          {project}
+                    {loadingProjects ? (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">Cargando proyectos...</div>
+                    ) : projects.length > 0 ? (
+                      projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
                         </SelectItem>
-                      ))}
+                      ))
+                    ) : (
+                      <div className="px-2 py-1.5 text-sm text-muted-foreground">No hay proyectos disponibles</div>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -214,9 +241,10 @@ export default function ClientMeetingsPage() {
                 <SelectValue placeholder="Filtrar por proyecto" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="Todos">Todos los proyectos</SelectItem>
                 {projects.map((project) => (
-                  <SelectItem key={project} value={project}>
-                    {project}
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -273,7 +301,7 @@ export default function ClientMeetingsPage() {
                           <div>
                             <div className="font-medium">{meeting.title}</div>
                             <div className="text-sm text-muted-foreground">
-                              {typeof meeting.project === 'object' ? meeting.project.title : 'Sin proyecto'}
+                              {meeting.project ? meeting.project.name : 'Sin proyecto'}
                             </div>
                           </div>
                         </div>

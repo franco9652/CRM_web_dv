@@ -14,7 +14,7 @@ import { Customer, getAllCustomers, getCustomers, getCustomersByUserId } from "@
 import { getAllWorks, getWorks, getWorksByCustomerId, Work } from "@/services/works"
 import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
-import { Budget, getAllBudgets, getBudgetsByUserId } from "@/services/budgets"
+import { Budget, getAllBudgets } from "@/services/budgets"
 
 export default function AdminDashboard() {
   const { user } = useAuth()
@@ -132,12 +132,6 @@ export default function AdminDashboard() {
             // Obtener todos los presupuestos para admin
             const response = await getAllBudgets()
             data = response
-          } else if (user.role === "client" || user.role === "customer" || user.role === "employee") {
-            // Obtener solo los presupuestos del cliente o empleado
-            if (!user.id) throw new Error("ID de cliente no válido")
-            const budgetsResult = await getBudgetsByUserId(user.id)
-            // const budgetsResult = await getBudgetsByUserId("678ac8bbcaa29603b2663cba")
-            data = budgetsResult?.budgets || []
           } else {
             throw new Error("Rol de usuario no soportado")
           }

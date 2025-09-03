@@ -308,7 +308,10 @@ interface BudgetFormData {
                 <Label htmlFor="projectType">Tipo de Proyecto</Label>
                 <Select 
                   value={formData.projectType}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, projectType: value }))}
+                  onValueChange={(value: ProjectType) => setFormData(prev => ({ 
+                    ...prev, 
+                    projectType: value 
+                  }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccione tipo de proyecto" />

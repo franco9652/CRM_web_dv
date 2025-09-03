@@ -13,12 +13,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Loader2, MoreHorizontal, Search } from "lucide-react"
-import { getAllBudgets, Budget } from "@/services/budgets"
+import { getBudgetsByCustomerId, Budget, BudgetsResponse } from "@/services/budgets"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function BudgetsPage() {
+export default function ClientBudgetsPage() {
   const { user } = useAuth()
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
@@ -28,9 +28,14 @@ export default function BudgetsPage() {
 
   useEffect(() => {
     const fetchBudgets = async () => {
+      if (!user?.customerId) {
+        setIsLoading(false)
+        return
+      }
+
       try {
-        const data = await getAllBudgets()
-        setBudgets(data)
+        const response: BudgetsResponse = await getBudgetsByCustomerId(user.customerId)
+        setBudgets(response.budgets || [])
       } catch (error) {
         toast({
           title: "Error",
@@ -43,7 +48,7 @@ export default function BudgetsPage() {
     }
 
     fetchBudgets()
-  }, [toast])
+  }, [toast, user?.customerId])
 
   const filteredBudgets = budgets.filter((budget) => {
     const searchLower = searchTerm.toLowerCase()
@@ -72,7 +77,7 @@ export default function BudgetsPage() {
     return (
       <div className="text-center py-8 flex justify-center items-center p-6">
         <Loader2 className="animate-spin text-primary" size={24} />
-        <p className="px-6">Cargando presupuesto...</p>
+        <p className="px-6">Cargando presupuestos...</p>
       </div>
     )
   }
@@ -80,10 +85,7 @@ export default function BudgetsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Presupuestos</h1>
-        <Button onClick={() => router.push("/admin/budgets/new")}>
-          Nuevo Presupuesto
-        </Button>
+        <h1 className="text-2xl font-bold tracking-tight">Mis Presupuestos</h1>
       </div>
 
       <Card>
@@ -107,7 +109,6 @@ export default function BudgetsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>ID</TableHead>
-                <TableHead>Cliente</TableHead>
                 <TableHead>Dirección</TableHead>
                 <TableHead>Presupuesto</TableHead>
                 <TableHead>Fecha Inicio</TableHead>
@@ -121,9 +122,6 @@ export default function BudgetsPage() {
                 filteredBudgets.map((budget) => (
                   <TableRow key={budget._id}>
                     <TableCell>{budget.ID}</TableCell>
-                    <TableCell className="font-medium">
-                      {budget.customerName}
-                    </TableCell>
                     <TableCell>{budget.projectAddress}</TableCell>
                     <TableCell>
                       {formatCurrency(budget.estimatedBudget, budget.currency)}
@@ -155,17 +153,10 @@ export default function BudgetsPage() {
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuItem
                             onClick={() =>
-                              router.push(`/admin/budgets/${budget._id}`)
+                              router.push(`/client/budgets/${budget._id}`)
                             }
                           >
                             Ver detalles
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              router.push(`/admin/budgets/${budget._id}/edit`)
-                            }
-                          >
-                            Editar
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -175,7 +166,7 @@ export default function BudgetsPage() {
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={7}
                     className="h-24 text-center text-muted-foreground"
                   >
                     No se encontraron presupuestos.
