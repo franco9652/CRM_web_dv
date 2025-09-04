@@ -12,6 +12,7 @@ import type { Work } from "@/services/works"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/components/ui/use-toast"
 import { Customer, getCustomersByUserId } from "@/services/customers"
+import ClientTour from "@/components/client/client-tour"
 
 // Define el tipo Milestone localmente
 interface Milestone {
@@ -79,7 +80,7 @@ export default function ClientProjectsPage() {
     setLoadingCustomers(true)
     try {
       const data = await getCustomersByUserId(user.id);
-      setCustomers(data);
+      setCustomers(data.customer);
     } catch (err: any) {
       setCustomersError(err.message ?? "Error al obtener customers");
       setLoadingCustomers(false);
@@ -175,8 +176,9 @@ export default function ClientProjectsPage() {
 
   return (
     <div style={{ position: "relative" }}>
+      <ClientTour />
       {renderUserRoleFlag()}
-      <div className="space-y-6 pb-6">
+      <div id="projects-section" className="space-y-6 pb-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Mis Proyectos</h1>

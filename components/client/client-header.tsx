@@ -56,9 +56,9 @@ export default function ClientHeader() {
               {user?.role === "client" && <div className="text-xs font-normal text-muted-foreground">{user?.name}</div>}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/client/profile")}>Perfil de Empresa</DropdownMenuItem>
+            {/* <DropdownMenuItem onClick={() => router.push("/client/profile")}>Perfil de Empresa</DropdownMenuItem>
             <DropdownMenuItem onClick={() => router.push("/client/settings")}>Configuración</DropdownMenuItem>
-            <DropdownMenuSeparator />
+            <DropdownMenuSeparator /> */}
             <DropdownMenuItem onClick={logout}>Cerrar sesión</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

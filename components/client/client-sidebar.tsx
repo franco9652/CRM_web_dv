@@ -15,7 +15,7 @@ export default function ClientSidebar() {
   }
 
   return (
-    <div className={`border-r bg-background transition-all duration-300 ${collapsed ? "w-[70px]" : "w-[250px]"}`}>
+    <div id="client-sidebar" className={`border-r bg-background transition-all duration-300 ${collapsed ? "w-[70px]" : "w-[250px]"}`}>
       <div className="flex flex-col min-h-screen">
         <div className="flex h-14 items-center border-b px-4">
           <Link href="/client/dashboard" className="flex items-center gap-2 font-semibold">
