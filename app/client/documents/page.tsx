@@ -401,7 +401,7 @@ export default function ClientDocumentsPage() {
       }
       
       // Refresh documents list
-      await fetchWorks();
+      await fetchWorks(selectedCustomerId);
       
       // Show success message
       toast({
