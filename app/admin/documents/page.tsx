@@ -5,6 +5,7 @@ import { useState, useEffect } from "react"
 import axios from "axios"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
+import { getWorksByCustomerId } from "@/services/works"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -101,15 +102,6 @@ const initialDocuments = [
   },
 ]
 
-// Proyectos disponibles para el selector
-const availableProjects = [
-  "Torre Skyline",
-  "Complejo Riverside",
-  "Parque Oficinas Metro",
-  "Residencias Sunset",
-  "Hotel Vista al Puerto",
-]
-
 // Categorías disponibles para el selector
 const availableCategories = [
   "Planos",
@@ -136,6 +128,8 @@ export default function DocumentsPage() {
 
   const [customers, setCustomers] = useState<Array<{_id: string, name: string}>>([]);
   const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [customerWorks, setCustomerWorks] = useState<Array<{_id: string, name: string}>>([]);
+  const [isLoadingWorks, setIsLoadingWorks] = useState(false);
 
   const [newDocument, setNewDocument] = useState({
     name: "",
@@ -211,6 +205,42 @@ export default function DocumentsPage() {
       fetchCustomers();
     }
   }, [])
+
+  // Fetch works when customer changes
+  useEffect(() => {
+    const fetchCustomerWorks = async () => {
+      if (!selectedCustomer) {
+        setCustomerWorks([]);
+        setNewDocument(prev => ({ ...prev, project: "" }));
+        return;
+      }
+
+      setIsLoadingWorks(true);
+      try {
+        const response = await getWorksByCustomerId(selectedCustomer);
+        if (response.works && Array.isArray(response.works)) {
+          setCustomerWorks(response.works.map(work => ({
+            _id: work._id,
+            name: work.name
+          })));
+        } else {
+          setCustomerWorks([]);
+        }
+      } catch (error) {
+        console.error('Error fetching customer works:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudieron cargar los proyectos del cliente',
+          variant: 'destructive',
+        });
+        setCustomerWorks([]);
+      } finally {
+        setIsLoadingWorks(false);
+      }
+    };
+
+    fetchCustomerWorks();
+  }, [selectedCustomer, toast])
 
   interface UploadResponse {
     message: string
@@ -348,31 +378,6 @@ export default function DocumentsPage() {
         variant: 'destructive',
       });
     }
-
-    const id = documents.length > 0 ? Math.max(...documents.map((d) => d.id)) + 1 : 1
-    const now = new Date()
-
-    const newDoc = {
-      id,
-      name: newDocument.name,
-      project: newDocument.project,
-      category: newDocument.category,
-      type: newDocument.file?.name.split(".").pop()?.toUpperCase() || "PDF",
-      size: `${(newDocument?.file?.size / (1024 * 1024)).toFixed(1)} MB`,
-      uploadDate: now.toISOString().split("T")[0],
-      uploadedBy: "Juan Pérez", // Usuario actual
-      status: "Pendiente",
-    }
-
-    setDocuments([newDoc, ...documents])
-    setNewDocument({
-      name: "",
-      project: "",
-      category: "",
-      description: "",
-      file: null,
-    })
-    setIsUploadDialogOpen(false)
   }
 
   return (
@@ -422,19 +427,30 @@ export default function DocumentsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                <Label htmlFor="doc-project">Proyecto</Label>
-
+                  <Label htmlFor="doc-project">Proyecto</Label>
                   <Select
                     value={newDocument.project}
                     onValueChange={(value) => setNewDocument({ ...newDocument, project: value })}
+                    disabled={!selectedCustomer || isLoadingWorks || customerWorks.length === 0}
                   >
                     <SelectTrigger id="doc-project">
-                      <SelectValue placeholder="Seleccionar proyecto" />
+                      <SelectValue placeholder={
+                        !selectedCustomer 
+                          ? "Primero seleccione un cliente" 
+                          : isLoadingWorks 
+                            ? "Cargando proyectos..."
+                            : customerWorks.length === 0
+                              ? "No hay proyectos para este cliente"
+                              : "Seleccionar proyecto"
+                      } />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableProjects.map((project) => (
-                        <SelectItem key={project} value={project}>
-                          {project}
+                      {customerWorks.map((work) => (
+                        <SelectItem key={work._id} value={work.name}>
+                          <div className="flex items-center gap-2">
+                            <Building className="h-4 w-4" />
+                            {work.name}
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -502,7 +518,7 @@ export default function DocumentsPage() {
               </Button>
               <Button 
                 onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={isUploading}
+                disabled={isUploading || !selectedCustomer || !newDocument.project}
               >
                 {isUploading ? (
                   <>
@@ -643,4 +659,3 @@ export default function DocumentsPage() {
     </div>
   )
 }
-
