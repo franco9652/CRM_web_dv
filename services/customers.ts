@@ -15,7 +15,16 @@ export interface Customer {
   name: string;
   email: string;
   phone?: string;
+  contactNumber?: string;
+  dni?: string;
+  cuit?: string;
   address?: string;
+  workDirection?: string;
+  worksActive?: any[];
+  meetings?: any[];
+  documents?: any[];
+  active?: boolean;
+  createdAt?: string;
   [key: string]: any;
 }
 

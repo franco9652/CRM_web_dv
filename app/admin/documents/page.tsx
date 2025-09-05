@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import axios from "axios"
+import { Customer, getAllCustomers } from "@/services/customers"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 import { getWorksByCustomerId } from "@/services/works"
@@ -32,75 +32,19 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 
-// Datos de documentos de ejemplo
-const initialDocuments = [
-  {
-    id: 1,
-    name: "Torre Skyline - Planos de Planta",
-    project: "Torre Skyline",
-    category: "Planos",
-    type: "PDF",
-    size: "5.2 MB",
-    uploadDate: "2024-03-15",
-    uploadedBy: "Juan Pérez",
-    status: "Aprobado",
-  },
-  {
-    id: 2,
-    name: "Complejo Riverside - Propuesta de Presupuesto",
-    project: "Complejo Riverside",
-    category: "Presupuesto",
-    type: "XLSX",
-    size: "1.8 MB",
-    uploadDate: "2024-03-10",
-    uploadedBy: "María López",
-    status: "Pendiente",
-  },
-  {
-    id: 3,
-    name: "Parque Oficinas Metro - Especificaciones de Materiales",
-    project: "Parque Oficinas Metro",
-    category: "Especificaciones",
-    type: "PDF",
-    size: "3.5 MB",
-    uploadDate: "2024-03-05",
-    uploadedBy: "Carlos Rodríguez",
-    status: "Aprobado",
-  },
-  {
-    id: 4,
-    name: "Torre Skyline - Cronograma de Construcción",
-    project: "Torre Skyline",
-    category: "Cronograma",
-    type: "PDF",
-    size: "2.1 MB",
-    uploadDate: "2024-02-28",
-    uploadedBy: "Ana Martínez",
-    status: "Pendiente",
-  },
-  {
-    id: 5,
-    name: "Complejo Riverside - Maquetas de Diseño",
-    project: "Complejo Riverside",
-    category: "Diseño",
-    type: "ZIP",
-    size: "15.7 MB",
-    uploadDate: "2024-02-20",
-    uploadedBy: "Roberto Sánchez",
-    status: "Aprobado",
-  },
-  {
-    id: 6,
-    name: "Residencias Sunset - Permisos Municipales",
-    project: "Residencias Sunset",
-    category: "Legal",
-    type: "PDF",
-    size: "4.3 MB",
-    uploadDate: "2024-02-15",
-    uploadedBy: "Laura Gómez",
-    status: "Aprobado",
-  },
-]
+// Initialize with empty array as we'll fetch documents from the API
+const initialDocuments: Array<{
+  id: number | string;
+  name: string;
+  project: string;
+  category: string;
+  type: string;
+  size: string;
+  uploadDate: string;
+  uploadedBy: string;
+  status: string;
+  url?: string;
+}> = [];
 
 // Categorías disponibles para el selector
 const availableCategories = [
@@ -115,18 +59,27 @@ const availableCategories = [
 ]
 
 export default function DocumentsPage() {
-  const [documents, setDocuments] = useState(initialDocuments)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [projectFilter, setProjectFilter] = useState("Todos")
-  const [categoryFilter, setCategoryFilter] = useState("Todas")
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
-  const [token, setToken] = useState<string | null>(null)
-  const { user } = useAuth()
-  const { toast } = useToast()
+  // State for documents and filters
+  const [documents, setDocuments] = useState(initialDocuments);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [projectFilter, setProjectFilter] = useState("Todos");
+  const [categoryFilter, setCategoryFilter] = useState("Todas");
+  
+  // Upload related state
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Auth and user state
+  const [token, setToken] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
-  const [customers, setCustomers] = useState<Array<{_id: string, name: string}>>([]);
+  // Customers state
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
+  
+  // Selected customer and works state
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [customerWorks, setCustomerWorks] = useState<Array<{_id: string, name: string}>>([]);
   const [isLoadingWorks, setIsLoadingWorks] = useState(false);
@@ -137,6 +90,7 @@ export default function DocumentsPage() {
     category: "",
     description: "",
     file: null as File | null,
+    url: ""
   })
 
   const filteredDocuments = documents.filter(
@@ -184,13 +138,12 @@ export default function DocumentsPage() {
 
     // Fetch customers
     const fetchCustomers = async () => {
+      if (!authToken) return;
+      
+      setIsLoadingCustomers(true);
       try {
-        const response: any = await axios.get(`${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/customers`, {
-          headers: {
-            'Authorization': `Bearer ${authToken}`
-          }
-        });
-        setCustomers(response.data.customers || []);
+        const customers = await getAllCustomers();
+        setCustomers(customers);
       } catch (error) {
         console.error('Error fetching customers:', error);
         toast({
@@ -198,12 +151,12 @@ export default function DocumentsPage() {
           description: 'No se pudieron cargar los clientes',
           variant: 'destructive',
         });
+      } finally {
+        setIsLoadingCustomers(false);
       }
     };
 
-    if (authToken) {
-      fetchCustomers();
-    }
+    fetchCustomers();
   }, [])
 
   // Fetch works when customer changes
@@ -211,7 +164,15 @@ export default function DocumentsPage() {
     const fetchCustomerWorks = async () => {
       if (!selectedCustomer) {
         setCustomerWorks([]);
-        setNewDocument(prev => ({ ...prev, project: "" }));
+        setNewDocument(prev => ({
+          ...prev,
+          project: "",
+          url: "",
+          name: "",
+          category: "",
+          description: "",
+          file: null
+        }));
         return;
       }
 
@@ -255,13 +216,62 @@ export default function DocumentsPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setNewDocument({ ...newDocument, file: e.target.files[0] })
+      setNewDocument({ 
+        ...newDocument, 
+        file: e.target.files[0],
+        url: '' // Initialize with empty string, will be set after upload
+      })
     }
   }
 
+  const handleDownload = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('No se pudo descargar el archivo');
+      
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      
+      link.href = downloadUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+      
+      toast({
+        title: "Descarga iniciada",
+        description: `El archivo ${fileName} se está descargando.`,
+      });
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el archivo. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleViewDetails = (document: any) => {
+    // Open the document URL in a new tab
+    if (document.url) {
+      window.open(document.url, '_blank');
+    } else {
+      toast({
+        title: "Error",
+        description: "No se pudo abrir el documento. El enlace no está disponible.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
-    if (!files || files.length === 0 || !user?._id) return
+    if (!files || files.length === 0) return
+    if (!user || !user._id) return
+    const userId = user._id.toString()
 
     setIsUploading(true)
     setUploadProgress(0)
@@ -270,7 +280,7 @@ export default function DocumentsPage() {
       const uploadPromises = Array.from(files).map(async (file) => {
         const uploadData = new FormData()
         uploadData.append('file', file)
-        uploadData.append('userId', user?._id.toString())
+        uploadData.append('userId', userId)
 
         if (!token) {
           throw new Error('No se encontró el token de autenticación')
@@ -341,6 +351,7 @@ export default function DocumentsPage() {
         category: "",
         description: "",
         file: null,
+        url: ""
       })
       
     } catch (error) {
@@ -430,7 +441,7 @@ export default function DocumentsPage() {
                   <Label htmlFor="doc-project">Proyecto</Label>
                   <Select
                     value={newDocument.project}
-                    onValueChange={(value) => setNewDocument({ ...newDocument, project: value })}
+                    onValueChange={(value) => setNewDocument({ ...newDocument, project: value, url: newDocument.url || "" })}
                     disabled={!selectedCustomer || isLoadingWorks || customerWorks.length === 0}
                   >
                     <SelectTrigger id="doc-project">
@@ -460,7 +471,7 @@ export default function DocumentsPage() {
                   <Label htmlFor="doc-category">Categoría</Label>
                   <Select
                     value={newDocument.category}
-                    onValueChange={(value) => setNewDocument({ ...newDocument, category: value })}
+                    onValueChange={(value) => setNewDocument({ ...newDocument, category: value, url: newDocument.url || "" })}
                   >
                     <SelectTrigger id="doc-category">
                       <SelectValue placeholder="Seleccionar categoría" />
@@ -480,7 +491,7 @@ export default function DocumentsPage() {
                 <Textarea
                   id="doc-description"
                   value={newDocument.description}
-                  onChange={(e) => setNewDocument({ ...newDocument, description: e.target.value })}
+                  onChange={(e) => setNewDocument({ ...newDocument, description: e.target.value, url: newDocument.url || "" })}
                   placeholder="Breve descripción del contenido del documento"
                 />
               </div>
@@ -580,77 +591,93 @@ export default function DocumentsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Documento</TableHead>
-                  <TableHead>Proyecto</TableHead>
-                  <TableHead className="hidden md:table-cell">Categoría</TableHead>
-                  <TableHead className="hidden md:table-cell">Subido</TableHead>
-                  <TableHead className="hidden md:table-cell">Tamaño</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Documentos</TableHead>
+                  <TableHead className="w-[100px]">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDocuments.map((document) => (
-                  <TableRow key={document.id}>
-                    <TableCell className="font-medium">
+                {customers
+                  .filter(customer => customer.documents && customer.documents.length > 0)
+                  .map((customer) => (
+                  <TableRow key={customer._id}>
+                    <TableCell className="font-medium align-top pt-6">
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        {document.name}
-                      </div>
-                      <div className="text-xs text-muted-foreground md:hidden">
-                        {document.type} • {document.size}
+                        <User className="h-4 w-4 text-muted-foreground" />
+                        {customer.name}
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        {document.project}
-                      </div>
+                      {customer.documents && customer.documents.length > 0 ? (
+                        <div className="space-y-2">
+                          {customer.documents.map((doc) => (
+                            <div key={doc._id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-medium">{doc.name}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(doc.uploadedAt).toLocaleDateString('es-AR')}
+                                </span>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8"
+                                  onClick={() => handleViewDetails(doc)}
+                                  title="Ver documento"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8"
+                                  onClick={() => handleDownload(doc.url, doc.name)}
+                                  title="Descargar"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground text-sm py-2">
+                          No hay documentos cargados
+                        </div>
+                      )}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell">{document.category}</TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="flex flex-col">
-                        <span>{formatDate(document.uploadDate)}</span>
-                        <span className="text-xs text-muted-foreground">{document.uploadedBy}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      <div className="flex items-center gap-1">
-                        <span>{document.type}</span>
-                        <span className="text-xs text-muted-foreground">({document.size})</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusColor(document.status)}`}
+                    <TableCell className="align-top pt-6">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedCustomer(customer._id);
+                          setIsUploadDialogOpen(true);
+                        }}
                       >
-                        {document.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Ver detalles</DropdownMenuItem>
-                          <DropdownMenuItem>Descargar</DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-red-600">Eliminar</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Subir
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
-                {filteredDocuments.length === 0 && (
+                {isLoadingCustomers ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                      No se encontraron documentos. Intenta ajustar tu búsqueda o sube un nuevo documento.
+                    <TableCell colSpan={3} className="text-center py-12">
+                      <div className="flex justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                      </div>
                     </TableCell>
                   </TableRow>
-                )}
+                ) : customers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                      No se encontraron clientes.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
               </TableBody>
             </Table>
           </div>

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { CheckCircle2, Clock, Download, Eye, FileText, Search, Upload } from "lucide-react"
 import {
   Dialog,
@@ -93,6 +94,9 @@ export default function ClientDocumentsPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [documentsList, setDocumentsList] = useState<any[]>([])
   const [availableProjects, setAvailableProjects] = useState<string[]>([])
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10) // Number of items per page
   
   // Estados para el formulario de subida
   const [documentFile, setDocumentFile] = useState<File | null>(null)
@@ -211,19 +215,30 @@ export default function ClientDocumentsPage() {
     }
   };
 
-  const filteredDocuments = documentsList.filter((document) => {
-    if (!document) return false;
-    
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = searchTerm === '' || 
-      (document.name && document.name.toLowerCase().includes(searchLower)) ||
-      (document.project && document.project.toLowerCase().includes(searchLower));
-    
-    const matchesProject = projectFilter === "Todos" || document.project === projectFilter;
-    const matchesCategory = categoryFilter === "Todas" || document.category === categoryFilter;
-    
-    return matchesSearch && matchesProject && matchesCategory;
+  const filteredDocuments = documentsList.filter((doc) => {
+    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.project.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesProject = projectFilter === "Todos" || doc.project === projectFilter
+    const matchesCategory = categoryFilter === "Todas" || doc.category === categoryFilter
+
+    return matchesSearch && matchesProject && matchesCategory
   })
+
+  // Get current documents for pagination
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentDocuments = filteredDocuments.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage)
+
+  // Change page
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber)
+  const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages))
+  const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1))
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, projectFilter, categoryFilter])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -306,6 +321,13 @@ export default function ClientDocumentsPage() {
     };
   }
 
+  interface UploadedFile {
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !user?._id) return;
@@ -324,15 +346,7 @@ export default function ClientDocumentsPage() {
     };
 
     try {
-      // Define the return type for the upload promise
-      type UploadResult = {
-        name: string;
-        url: string;
-        size: number;
-        type: string;
-      };
-
-      const uploadPromises: Promise<UploadResult>[] = Array.from(files).map(async (file) => {
+      const uploadPromises: Promise<UploadedFile>[] = Array.from(files).map(async (file) => {
         const uploadData = new FormData();
         uploadData.append('file', file);
         
@@ -395,14 +409,35 @@ export default function ClientDocumentsPage() {
       
       // Check if any uploads failed
       const failedUploads = results.filter(result => result.status === 'rejected');
+      
       if (failedUploads.length > 0) {
         console.error('Algunos archivos no se pudieron subir:', failedUploads);
         throw new Error(`No se pudieron subir ${failedUploads.length} de ${results.length} archivos`);
       }
       
-      // Refresh documents list
-      await fetchWorks(selectedCustomerId);
+      // Process successful uploads
+      const newDocs = results
+        .filter((result): result is PromiseFulfilledResult<UploadedFile> => 
+          result.status === 'fulfilled' && result.value !== undefined
+        )
+        .map((result, index) => {
+          const file = result.value;
+          return {
+            id: (documentsList.length + index + 1).toString(),
+            name: file.name,
+            project: documentProject,
+            category: documentCategory,
+            type: file.type || file.name.split('.').pop()?.toUpperCase() || 'FILE',
+            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+            uploadDate: new Date().toISOString().split('T')[0],
+            status: 'Disponible',
+            url: file.url,
+            requiresAction: false
+          };
+        });
       
+      // Update the documents list with the new documents
+      setDocumentsList(prev => [...prev, ...newDocs]);
       // Show success message
       toast({
         title: 'Éxito',
@@ -422,6 +457,7 @@ export default function ClientDocumentsPage() {
       });
     } finally {
       setIsUploading(false);
+      fetchWorks(selectedCustomerId);
     }
   };
 
@@ -748,7 +784,7 @@ export default function ClientDocumentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDocuments.map((document) => (
+                {currentDocuments.map((document) => (
                   <TableRow key={document.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -811,6 +847,69 @@ export default function ClientDocumentsPage() {
                 )}
               </TableBody>
             </Table>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end space-x-2 py-4">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredDocuments.length)} de {filteredDocuments.length} documentos
+                </div>
+                <Pagination className="justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        href="#" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          prevPage();
+                        }}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                    
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      // Show first 2 pages, current page with neighbors, and last 2 pages
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink 
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              paginate(pageNum);
+                            }}
+                            isActive={currentPage === pageNum}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        href="#" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          nextPage();
+                        }}
+                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -266,7 +266,6 @@ export default function AdminDashboard() {
     });
   }, [customers]);
 
-  console.log('monthlyCustomerData: ', monthlyCustomerData)
 
   return (
     <div className="space-y-6">

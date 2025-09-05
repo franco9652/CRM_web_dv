@@ -72,7 +72,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Guardar el token
       localStorage.setItem("token", response.token)
-      console.log('ACA LOS DATOS DEL RESPONSE LOGIN:\n', response)
 
       const userData: User = {
         id: response.userId,
