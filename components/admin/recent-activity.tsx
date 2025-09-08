@@ -1,22 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Employee, getAllEmployees, getEmployees } from '@/services/employees';
+import { Employee, getAllEmployees } from '@/services/employees';
 
 function EmployeesList() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchEmployees = async (page: number) => {
+  const fetchEmployees = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const data = await getEmployees(page);
-      setEmployees(data.employees);
-      setTotalPages(data.totalPages);
-      setCurrentPage(data.page);
+      const data = await getAllEmployees();
+      setEmployees(data);
     } catch (err) {
       console.error('Error:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar los empleados');
@@ -26,14 +22,8 @@ function EmployeesList() {
   };
 
   useEffect(() => {
-    fetchEmployees(currentPage);
+    fetchEmployees();
   }, []);
-
-  const handlePageChange = (newPage: number) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      fetchEmployees(newPage);
-    }
-  };
 
   if (loading && employees.length === 0) {
     return <div className="p-4">Cargando empleados...</div>;
@@ -44,7 +34,7 @@ function EmployeesList() {
       <div className="p-4 bg-red-50 text-red-700 rounded-md">
         <p>Error: {error}</p>
         <button 
-          onClick={() => fetchEmployees(currentPage)}
+          onClick={() => fetchEmployees()}
           className="mt-2 px-4 py-2 bg-red-100 hover:bg-red-200 rounded"
         >
           Reintentar
@@ -103,34 +93,6 @@ function EmployeesList() {
         </table>
       </div>
 
-      {/* Paginación */}
-      {totalPages > 1 && (
-        <div className="mt-6 flex justify-between items-center">
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className={`px-4 py-2 rounded ${currentPage === 1 
-              ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
-              : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-          >
-            Anterior
-          </button>
-          
-          <span className="text-sm text-gray-700">
-            Página {currentPage} de {totalPages}
-          </span>
-          
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded ${currentPage === totalPages 
-              ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
-              : 'bg-blue-500 text-white hover:bg-blue-600'}`}
-          >
-            Siguiente
-          </button>
-        </div>
-      )}
     </div>
   );
 }

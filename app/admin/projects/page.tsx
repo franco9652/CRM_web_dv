@@ -247,7 +247,7 @@ export default function ProjectsPage() {
                               <DropdownMenuItem onClick={() => navigateToProjectDetails(project._id)}>
                                 Ver Documentos
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => router.push(`/admin/projects/${project._id}/schedule`)}>
+                              <DropdownMenuItem onClick={() => router.push(`/admin/calendar`)}>
                                 Programar Reunión
                               </DropdownMenuItem>
                             </DropdownMenuContent>

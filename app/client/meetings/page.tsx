@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Clock, Search, Video } from "lucide-react"
+import { Calendar, Clock, Loader2, Search, Video } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -274,7 +274,7 @@ export default function ClientMeetingsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredMeetings.length === 0 ? (
+                {filteredMeetings.length === 0 && !loading ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-8">
                       <div className="flex flex-col items-center justify-center space-y-2">
@@ -286,7 +286,7 @@ export default function ClientMeetingsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ) : (
+                ) : !loading ? (
                   filteredMeetings.map((meeting) => (
                     <TableRow key={meeting._id}>
                       <TableCell className="font-medium">
@@ -322,6 +322,15 @@ export default function ClientMeetingsPage() {
                       </TableCell>
                     </TableRow>
                   ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8">
+                      <div className="text-center py-8 flex justify-center items-center p-6">
+                        <Loader2 className="animate-spin text-primary" size={24} />
+                        <p className="px-6">Cargando reuniones...</p>
+                    </div>
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
