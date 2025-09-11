@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Building, Download, Eye, FileText, Loader2, MoreHorizontal, Plus, Search, Upload, User } from "lucide-react"
+import { Building, Download, Eye, FileText, Loader2, MoreHorizontal, Plus, Search, Upload, User, Trash2 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,16 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 // Initialize with empty array as we'll fetch documents from the API
 const initialDocuments: Array<{
@@ -83,6 +93,11 @@ export default function DocumentsPage() {
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [customerWorks, setCustomerWorks] = useState<Array<{_id: string, name: string}>>([]);
   const [isLoadingWorks, setIsLoadingWorks] = useState(false);
+  
+  // Delete document state
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<{customerId: string, fileName: string, documentName: string, documentId: string} | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [newDocument, setNewDocument] = useState({
     name: "",
@@ -264,6 +279,81 @@ export default function DocumentsPage() {
         description: "No se pudo abrir el documento. El enlace no está disponible.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteDocument = (customerId: string, documentUrl: string | undefined, documentName: string, documentId: string) => {
+    const fileNameFromUrl = (() => {
+      try {
+        if (!documentUrl) return "";
+        const cleanUrl = documentUrl.split('?')[0];
+        const last = cleanUrl.split('/').pop();
+        return last || "";
+      } catch {
+        return "";
+      }
+    })();
+
+    setDocumentToDelete({ customerId, fileName: fileNameFromUrl, documentName, documentId });
+    setIsDeleteDialogOpen(true);
+  };
+
+  const deleteDocument = async () => {
+    if (!documentToDelete || !token) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${documentToDelete.customerId}/documents/${documentToDelete.documentId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            documentId: documentToDelete.documentId
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al eliminar el documento');
+      }
+
+      // Update customers state to remove the deleted document
+      setCustomers(prevCustomers => 
+        prevCustomers.map(customer => {
+          if (customer._id === documentToDelete.customerId) {
+            return {
+              ...customer,
+              documents: (customer.documents || []).filter((doc: any) => {
+                return doc._id !== documentToDelete.documentId;
+              })
+            };
+          }
+          return customer;
+        })
+      );
+
+      toast({
+        title: "Éxito",
+        description: `El documento "${documentToDelete.documentName}" ha sido eliminado correctamente.`,
+        variant: "default",
+      });
+
+      setIsDeleteDialogOpen(false);
+      setDocumentToDelete(null);
+    } catch (error) {
+      console.error('Error deleting document!!:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "No se pudo eliminar el documento. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -638,6 +728,15 @@ export default function DocumentsPage() {
                                 >
                                   <Download className="h-4 w-4" />
                                 </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  onClick={() => handleDeleteDocument(customer._id, doc.url, doc.name, doc._id)}
+                                  title="Eliminar documento"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
                             </div>
                           ))}
@@ -683,6 +782,36 @@ export default function DocumentsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el documento{" "}
+              <strong>"{documentToDelete?.documentName}"</strong> del sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteDocument}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                "Eliminar"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
