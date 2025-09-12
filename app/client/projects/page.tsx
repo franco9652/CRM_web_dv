@@ -90,6 +90,8 @@ export default function ClientProjectsPage() {
     }
   }
 
+  function fetchDatas(){} // eliminar despues es para mergear.
+
   useEffect(() => {
     fetchData()
     // fetchWorks()
