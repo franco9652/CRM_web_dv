@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, Loader2, User, Mail } from "lucide-react"
-import { getWorkById, updateWork, Work, UpdateWorkInput } from "@/services/works"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { ChevronLeft, Loader2, User, Mail, Trash2 } from "lucide-react"
+import { getWorkById, updateWork, deleteWork, Work, UpdateWorkInput } from "@/services/works"
 import { getCustomers } from "@/services/customers"
 import { useToast } from "@/hooks/use-toast"
 
@@ -21,6 +22,7 @@ export default function ProjectEditPage() {
   const [formData, setFormData] = useState<UpdateWorkInput>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [customers, setCustomers] = useState<Array<{_id: string, name: string, email: string}>>([])
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false)
@@ -113,6 +115,28 @@ export default function ProjectEditPage() {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!project?._id || !project.ID) return
+    
+    setDeleting(true)
+    try {
+      await deleteWork(project.ID)
+      toast({
+        title: "Proyecto eliminado",
+        description: "El proyecto ha sido eliminado correctamente.",
+      })
+      router.push('/admin/projects')
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el proyecto.",
+        variant: "destructive",
+      })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -273,8 +297,36 @@ export default function ProjectEditPage() {
               </div>
           </CardContent>
         </Card>
-        <div className="flex justify-end mt-6">
-          <Button type="submit" disabled={saving}>
+        <div className="flex justify-between mt-6">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" disabled={deleting || saving}>
+                {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                Eliminar Proyecto
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. Se eliminará permanentemente el proyecto "{project?.name}" y todos sus datos asociados.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  disabled={deleting}
+                >
+                  {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          
+          <Button type="submit" disabled={saving || deleting}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Guardar Cambios
           </Button>

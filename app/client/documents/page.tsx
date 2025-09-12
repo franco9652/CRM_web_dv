@@ -2,12 +2,13 @@
 
 import type React from "react"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { CheckCircle2, Clock, Download, Eye, FileText, Search, Upload } from "lucide-react"
 import {
   Dialog,
@@ -93,45 +94,40 @@ export default function ClientDocumentsPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [documentsList, setDocumentsList] = useState<any[]>([])
   const [availableProjects, setAvailableProjects] = useState<string[]>([])
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10) // Number of items per page
   
+  // Estados para el formulario de subida
+  const [documentFile, setDocumentFile] = useState<File | null>(null)
+  const [documentProject, setDocumentProject] = useState("")
+  const [documentProjectId, setDocumentProjectId] = useState("")
+  const [documentCategory, setDocumentCategory] = useState("")
+  const [documentName, setDocumentName] = useState("")
+  const [documentDescription, setDocumentDescription] = useState("")
   
   // Actualizar documentos cuando cambian los clientes
   useEffect(() => {
     if (customers && customers.length > 0) {
       const docs = extractDocumentsFromCustomer(customers);
       setDocumentsList(docs);
-      
-      // Actualizar la lista de proyectos disponibles (nombres de clientes)
-      const customerNames = [...new Set(customers.map(customer => customer.name))];
-      setAvailableProjects(customerNames);
     } else {
       setDocumentsList([]);
-      setAvailableProjects([]);
     }
   }, [customers]);
 
-    const fetchWorks = async () => {
-      if (!user?.role) {
-        setWorksError("No se encontró el rol del usuario actual")
-        return
+    const fetchWorks = async (customerId: string) => {
+      if (!customerId) {
+        setWorks([]);
+        return;
       }
-      setLoadingWorks(true)
-      setWorksError("")
+      
+      setLoadingWorks(true);
+      setWorksError("");
       try {
-        let data: any = []
-        if (user.role === "admin") {
-          // Obtener todos los proyectos para admin
-          const response = await getWorks(1)
-          data = response.works
-        } else if (user.role === "client" || user.role === "customer" || user.role === "employee") {
-          // Obtener solo los proyectos del cliente o empleado
-          if (!user._id) throw new Error("ID de cliente no válido")
-          const response = await getWorksByCustomerId(user._id)
-          data = response.works || []
-        } else {
-          throw new Error("Rol de usuario no soportado")
-        }
-        setWorks(data)
+        const response = await getWorksByCustomerId(customerId);
+        const data = response.works || [];
+        setWorks(data);
       } catch (err: any) {
         if(err?.status === 400){
           setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
@@ -166,37 +162,83 @@ export default function ClientDocumentsPage() {
     }
   
     useEffect(() => {
-      fetchWorks()
+      // Only fetch customers initially, works will be fetched when a customer is selected
       fetchData()
     }, [user?.id, user?.role])
+    
+    // When customers are loaded, select the first one by default if there's only one
+    useEffect(() => {
+      if (customers.length === 1 && !selectedCustomerId) {
+        setSelectedCustomerId(customers[0]._id);
+        fetchWorks(customers[0]._id);
+      }
+    }, [customers]);
 
-  const [newDocument, setNewDocument] = useState<{
-    name: string;
-    project: string;
-    category: string;
-    description: string;
-    file: File | null;
-  }>({
-    name: "",
-    project: "",
-    category: "",
-    description: "",
-    file: null,
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
+
+  // Handle customer selection change
+  const handleCustomerChange = useCallback((customerId: string) => {
+    setSelectedCustomerId(customerId);
+    setDocumentProjectId("");
+    setDocumentProject("");
+    fetchWorks(customerId);
+  }, [user?.role]);
+
+  // Memoized handlers
+  const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setDocumentName(e.target.value);
+  }, []);
+  
+  const handleProjectChange = useCallback((value: string) => {
+    const selectedWork = works.find(work => work._id === value);
+    setDocumentProject(selectedWork?.name || '');
+    setDocumentProjectId(value);
+  }, [works]);
+  
+  const handleCategoryChange = useCallback((value: string) => {
+    setDocumentCategory(value);
+  }, []);
+  
+  const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDocumentDescription(e.target.value);
+  }, []);
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      setDocumentFile(files[0]);
+      // Update the document name if it's not set
+      if (!documentName && files[0].name) {
+        const fileName = files[0].name.split('.').slice(0, -1).join('.');
+        setDocumentName(fileName);
+      }
+    }
+  };
+
+  const filteredDocuments = documentsList.filter((doc) => {
+    const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      doc.project.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesProject = projectFilter === "Todos" || doc.project === projectFilter
+    const matchesCategory = categoryFilter === "Todas" || doc.category === categoryFilter
+
+    return matchesSearch && matchesProject && matchesCategory
   })
 
-  const filteredDocuments = documentsList.filter((document) => {
-    if (!document) return false;
-    
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = searchTerm === '' || 
-      (document.name && document.name.toLowerCase().includes(searchLower)) ||
-      (document.project && document.project.toLowerCase().includes(searchLower));
-    
-    const matchesProject = projectFilter === "Todos" || document.project === projectFilter;
-    const matchesCategory = categoryFilter === "Todas" || document.category === categoryFilter;
-    
-    return matchesSearch && matchesProject && matchesCategory;
-  })
+  // Get current documents for pagination
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentDocuments = filteredDocuments.slice(indexOfFirstItem, indexOfLastItem)
+  const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage)
+
+  // Change page
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber)
+  const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages))
+  const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1))
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, projectFilter, categoryFilter])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -237,11 +279,6 @@ export default function ClientDocumentsPage() {
   // Extraer categorías únicas para el filtro
   const categories = ["Todas", ...Array.from(new Set(documentsList.map((doc) => doc?.category).filter(Boolean)))]
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setNewDocument(prev => ({ ...prev, file: e.target.files![0] }));
-    }
-  };
 
   const handleDownload = async (url: string, fileName: string) => {
     try {
@@ -284,23 +321,32 @@ export default function ClientDocumentsPage() {
     };
   }
 
+  interface UploadedFile {
+    name: string;
+    url: string;
+    size: number;
+    type: string;
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !user?._id) return;
 
     setIsUploading(true);
     setUploadProgress(0);
+    
+    // Prepare newDocument object from individual state values
+    const newDocument = {
+      name: documentName,
+      project: documentProject,
+      projectId: documentProjectId,
+      category: documentCategory,
+      description: documentDescription,
+      file: documentFile,
+    };
 
     try {
-      // Define the return type for the upload promise
-      type UploadResult = {
-        name: string;
-        url: string;
-        size: number;
-        type: string;
-      };
-
-      const uploadPromises: Promise<UploadResult>[] = Array.from(files).map(async (file) => {
+      const uploadPromises: Promise<UploadedFile>[] = Array.from(files).map(async (file) => {
         const uploadData = new FormData();
         uploadData.append('file', file);
         
@@ -310,6 +356,11 @@ export default function ClientDocumentsPage() {
           throw new Error('ID de usuario o cliente no disponible');
         }
         uploadData.append('userId', userId);
+        
+        // Add workId to the form data if available
+        if (newDocument.projectId) {
+          uploadData.append('workId', newDocument.projectId);
+        }
 
         if (!token) {
           throw new Error('No se encontró el token de autenticación');
@@ -358,14 +409,35 @@ export default function ClientDocumentsPage() {
       
       // Check if any uploads failed
       const failedUploads = results.filter(result => result.status === 'rejected');
+      
       if (failedUploads.length > 0) {
         console.error('Algunos archivos no se pudieron subir:', failedUploads);
         throw new Error(`No se pudieron subir ${failedUploads.length} de ${results.length} archivos`);
       }
       
-      // Refresh documents list
-      await fetchWorks();
+      // Process successful uploads
+      const newDocs = results
+        .filter((result): result is PromiseFulfilledResult<UploadedFile> => 
+          result.status === 'fulfilled' && result.value !== undefined
+        )
+        .map((result, index) => {
+          const file = result.value;
+          return {
+            id: (documentsList.length + index + 1).toString(),
+            name: file.name,
+            project: documentProject,
+            category: documentCategory,
+            type: file.type || file.name.split('.').pop()?.toUpperCase() || 'FILE',
+            size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+            uploadDate: new Date().toISOString().split('T')[0],
+            status: 'Disponible',
+            url: file.url,
+            requiresAction: false
+          };
+        });
       
+      // Update the documents list with the new documents
+      setDocumentsList(prev => [...prev, ...newDocs]);
       // Show success message
       toast({
         title: 'Éxito',
@@ -385,22 +457,150 @@ export default function ClientDocumentsPage() {
       });
     } finally {
       setIsUploading(false);
+      fetchWorks(selectedCustomerId);
     }
   };
 
-  const handleUploadDocument = () => {
-    const fileInput = document.getElementById('doc-file') as HTMLInputElement;
-    if (fileInput && fileInput.files && fileInput.files.length > 0) {
-      const event = { target: fileInput } as unknown as React.ChangeEvent<HTMLInputElement>;
-      handleFileUpload(event);
-    } else {
+  const handleUploadDocument = useCallback(async () => {
+    if (!documentProjectId) {
       toast({
         title: 'Error',
-        description: 'Por favor seleccione al menos un archivo',
+        description: 'Por favor seleccione un proyecto',
         variant: 'destructive',
       });
+      return;
     }
-  }
+    
+    if (!documentFile) {
+      toast({
+        title: 'Error',
+        description: 'Por favor seleccione un archivo',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      setUploadProgress(0);
+      
+      const formData = new FormData();
+      formData.append('file', documentFile);
+      
+      const userId = user?.role === 'customer' ? user.customerId : user?._id;
+      if (!userId) {
+        throw new Error('ID de usuario o cliente no disponible');
+      }
+      
+      formData.append('userId', userId);
+      formData.append('workId', documentProjectId);
+      
+      if (documentName) formData.append('name', documentName);
+      if (documentCategory) formData.append('category', documentCategory);
+      if (documentDescription) formData.append('description', documentDescription);
+      
+      // Create a custom config with proper types
+      const config = {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'Authorization': `Bearer ${token}`
+        }
+      };
+
+      // Add upload progress handler
+      const progressHandler = (progressEvent: ProgressEvent) => {
+        if (progressEvent.lengthComputable) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        }
+      };
+
+      // Subir el archivo usando axios con manejo de progreso
+      try {
+        const response: any = await axios.post<{ url: string }>(
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            onUploadProgress: (progressEvent: { loaded: number; total: number }) => {
+              if (progressEvent.total) {
+                const percentCompleted = Math.round(
+                  (progressEvent.loaded * 100) / progressEvent.total
+                );
+                setUploadProgress(percentCompleted);
+              }
+            }
+          } as any // Usamos 'as any' temporalmente para evitar problemas de tipos
+        );
+        
+        // Verificar si la subida fue exitosa
+        if (response.data?.document?.url) {
+          // Éxito en la subida
+          toast({
+            title: "¡Éxito!",
+            description: "El archivo se ha subido correctamente.",
+            variant: "default",
+          });
+          
+          // Actualizar la lista de documentos
+          if (customers && customers.length > 0) {
+            const docs = extractDocumentsFromCustomer(customers);
+            setDocumentsList(docs);
+          }
+          
+          // Cerrar el diálogo y reiniciar el estado
+          setIsUploadDialogOpen(false);
+          setDocumentFile(null);
+          setUploadProgress(0);
+          setDocumentProject("");
+          setDocumentProjectId("");
+          setDocumentCategory("");
+          setDocumentName("");
+          setDocumentDescription("");
+        } else {
+          throw new Error("No se pudo subir el archivo");
+        }
+      } catch (error: any) {
+        console.error("Error al subir el archivo:", error);
+        toast({
+          title: "Error",
+          description: error.message || "Error al subir el archivo",
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploading(false);
+      }
+    } catch (error: any) {
+      console.error('Error uploading document:', error);
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Error al subir el documento',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  }, [documentProjectId, documentFile, documentName, documentCategory, documentDescription, user, token]);
+
+  // Reset form when dialog is closed
+  useEffect(() => {
+    if (!isUploadDialogOpen) {
+      setDocumentName('');
+      setDocumentProject('');
+      setDocumentProjectId('');
+      setDocumentCategory('');
+      setDocumentDescription('');
+      setDocumentFile(null);
+      // No resetear el cliente seleccionado para mejor UX
+    } else if (customers.length > 0 && !selectedCustomerId) {
+      // Si se abre el diálogo y hay clientes pero no hay uno seleccionado, seleccionar el primero
+      setSelectedCustomerId(customers[0]._id);
+      fetchWorks(customers[0]._id);
+    }
+  }, [isUploadDialogOpen, customers]);
 
   return (
     <div className="space-y-6">
@@ -427,61 +627,93 @@ export default function ClientDocumentsPage() {
                 <Label htmlFor="doc-name">Nombre del Documento</Label>
                 <Input
                   id="doc-name"
-                  value={newDocument.name}
-                  onChange={(e) => setNewDocument({ ...newDocument, name: e.target.value })}
+                  value={documentName}
+                  onChange={handleNameChange}
                   placeholder="Ej: Planos de planta baja"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="doc-customer">Cliente</Label>
+                  <Select
+                    value={selectedCustomerId}
+                    onValueChange={handleCustomerChange}
+                    disabled={customers.length === 0}
+                  >
+                    <SelectTrigger id="doc-customer">
+                      <SelectValue placeholder={customers.length > 0 ? "Seleccionar cliente" : "Cargando clientes..."} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer._id} value={customer._id}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid gap-2">
                   <Label htmlFor="doc-project">Proyecto</Label>
                   <Select
-                    value={newDocument.project}
-                    onValueChange={(value) => setNewDocument({ ...newDocument, project: value })}
+                    value={documentProjectId}
+                    onValueChange={handleProjectChange}
+                    disabled={!selectedCustomerId || works.length === 0}
                   >
                     <SelectTrigger id="doc-project">
-                      <SelectValue placeholder="Seleccionar proyecto" />
+                      <SelectValue placeholder={selectedCustomerId ? (works.length > 0 ? "Seleccionar proyecto" : "No hay proyectos") : "Seleccione un cliente"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableProjects.map((project) => (
-                        <SelectItem key={project} value={project}>
-                          {project}
+                      {works.map((work) => (
+                        <SelectItem key={work._id} value={work._id}>
+                          {work.name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="doc-category">Categoría</Label>
-                  <Select
-                    value={newDocument.category}
-                    onValueChange={(value) => setNewDocument({ ...newDocument, category: value })}
-                  >
-                    <SelectTrigger id="doc-category">
-                      <SelectValue placeholder="Seleccionar categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableCategories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="doc-category">Categoría</Label>
+                <Select
+                  value={documentCategory}
+                  onValueChange={setDocumentCategory}
+                >
+                  <SelectTrigger id="doc-category">
+                    <SelectValue placeholder="Seleccionar categoría" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="doc-description">Descripción (opcional)</Label>
                 <Textarea
                   id="doc-description"
-                  value={newDocument.description}
-                  onChange={(e) => setNewDocument({ ...newDocument, description: e.target.value })}
+                  value={documentDescription}
+                  onChange={handleDescriptionChange}
                   placeholder="Breve descripción del contenido del documento"
                 />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="doc-file">Archivo</Label>
-                <Input id="doc-file" type="file" onChange={handleFileChange} />
+                <div className="flex items-center gap-2">
+                  <Input 
+                    id="doc-file" 
+                    type="file" 
+                    onChange={handleFileChange}
+                    className="cursor-pointer"
+                  />
+                  {documentFile && (
+                    <span className="text-sm text-muted-foreground">
+                      {documentFile.name}
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Formatos aceptados: PDF, DOCX, XLSX, JPG, PNG, ZIP (máx. 50MB)
                 </p>
@@ -552,7 +784,7 @@ export default function ClientDocumentsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredDocuments.map((document) => (
+                {currentDocuments.map((document) => (
                   <TableRow key={document.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -615,6 +847,69 @@ export default function ClientDocumentsPage() {
                 )}
               </TableBody>
             </Table>
+            
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-end space-x-2 py-4">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredDocuments.length)} de {filteredDocuments.length} documentos
+                </div>
+                <Pagination className="justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        href="#" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          prevPage();
+                        }}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                    
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      // Show first 2 pages, current page with neighbors, and last 2 pages
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+                      
+                      return (
+                        <PaginationItem key={pageNum}>
+                          <PaginationLink 
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              paginate(pageNum);
+                            }}
+                            isActive={currentPage === pageNum}
+                          >
+                            {pageNum}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    })}
+                    
+                    <PaginationItem>
+                      <PaginationNext 
+                        href="#" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          nextPage();
+                        }}
+                        className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

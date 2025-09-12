@@ -4,8 +4,10 @@ type ApiError = {
   response?: {
     data?: {
       message?: string;
+      error?: string;
     };
   };
+  message?: string;
 };
 
 // Fuerza el endpoint de producción siempre, para desarrollo y producción
@@ -72,16 +74,21 @@ export async function getBudgetsByCustomerId(
  * Crea un nuevo presupuesto
  * @param budgetData Datos del presupuesto a crear
  */
+export interface BudgetResponse {
+  message: string;
+  budget: Budget;
+}
+
 /**
  * Obtiene un presupuesto por su ID
  * @param budgetId ID del presupuesto
  */
-export async function getBudgetById(budgetId: string): Promise<Budget> {
+export async function getBudgetById(budgetId: string): Promise<BudgetResponse> {
   if (!budgetId) throw new Error("ID de presupuesto inválido");
 
   try {
     const { data } = await axios.get(`${API_URL}/budgetgetbyid/${budgetId}`);
-    return data as Budget;
+    return data as BudgetResponse;
   } catch (error: unknown) {
     const apiError = error as ApiError;
     if (apiError?.response?.data?.message) {
@@ -90,6 +97,60 @@ export async function getBudgetById(budgetId: string): Promise<Budget> {
     }
     console.error('Unknown error fetching budget:', error);
     throw new Error('Error desconocido al obtener el presupuesto');
+  }
+}
+
+interface DeleteBudgetResponse {
+  message: string;
+  deletedBudget: Budget;
+}
+
+/**
+ * Elimina un presupuesto por su ID
+ * @param budgetId ID del presupuesto a eliminar
+ * @returns Objeto con mensaje y el presupuesto eliminado
+ */
+export async function deleteBudget(budgetId: string): Promise<DeleteBudgetResponse> {
+  if (!budgetId) throw new Error("ID de presupuesto inválido");
+
+  try {
+    const { data } = await axios.delete<DeleteBudgetResponse>(`${API_URL}/budgets/${budgetId}`);
+    return data;
+  } catch (error: unknown) {
+    const apiError = error as ApiError;
+    const errorMessage = apiError?.response?.data?.error || 
+                        apiError?.response?.data?.message || 
+                        apiError?.message || 
+                        'Error desconocido al eliminar el presupuesto';
+    
+    console.error('Error deleting budget:', errorMessage);
+    throw new Error(errorMessage);
+  }
+}
+
+/**
+ * Actualiza un presupuesto por su ID
+ * @param budgetId ID del presupuesto a actualizar
+ * @param budgetData Datos del presupuesto a actualizar
+ */
+export async function updateBudget(budgetId: string, budgetData: Partial<Budget>): Promise<BudgetResponse> {
+  if (!budgetId) throw new Error("ID de presupuesto inválido");
+
+  try {
+    const { data } = await axios.put(`${API_URL}/budgetsPut/${budgetId}`, budgetData);
+    return data as BudgetResponse;
+  } catch (error: unknown) {
+    const apiError = error as ApiError;
+    if (apiError?.response?.data?.error) {
+      console.error('Error updating budget:', apiError.response.data.error);
+      throw new Error(apiError.response.data.error);
+    }
+    if (apiError?.response?.data?.message) {
+      console.error('Error updating budget:', apiError.response.data.message);
+      throw new Error(apiError.response.data.message);
+    }
+    console.error('Unknown error updating budget:', error);
+    throw new Error('Error desconocido al actualizar el presupuesto');
   }
 }
 

@@ -5,21 +5,30 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, FileText, Calendar, Home, Ruler, Layers, Hammer, CheckCircle2, XCircle, Loader2 } from "lucide-react"
-import { getBudgetById, updateBudget } from "@/services/budgets"
+import { ArrowLeft, FileText, Calendar, Home, Ruler, Layers, Hammer, CheckCircle2, XCircle, Loader2, Edit, Trash2 } from "lucide-react"
+import { getBudgetById, deleteBudget } from "@/services/budgets"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
-import Link from "next/link"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 
-export default function BudgetDetailPage() {
+export default function AdminBudgetDetailPage() {
   const { id } = useParams()
   const { user } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const [budget, setBudget] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     const fetchBudget = async () => {
@@ -34,7 +43,7 @@ export default function BudgetDetailPage() {
           description: "No se pudo cargar el presupuesto",
           variant: "destructive",
         })
-        router.push("/client/budgets")
+        router.push("/admin/budgets")
       } finally {
         setIsLoading(false)
       }
@@ -43,25 +52,25 @@ export default function BudgetDetailPage() {
     fetchBudget()
   }, [id, router, toast])
 
-  const handleStatusChange = async (newStatus: string) => {
-    if (!budget || !id) return
+  const handleDelete = async () => {
+    if (!budget?._id) return
     
-    setIsUpdatingStatus(true)
+    setIsDeleting(true)
     try {
-      await updateBudget(id as string, { status: newStatus })
-      setBudget((prev: any) => ({ ...prev, status: newStatus }))
+      await deleteBudget(budget._id)
       toast({
-        title: "Estado actualizado",
-        description: `El presupuesto ha sido marcado como ${newStatus}`,
+        title: "Éxito",
+        description: "Presupuesto eliminado correctamente",
       })
+      router.push("/admin/budgets")
     } catch (error) {
       toast({
         title: "Error",
-        description: "No se pudo actualizar el estado del presupuesto",
+        description: "No se pudo eliminar el presupuesto",
         variant: "destructive",
       })
     } finally {
-      setIsUpdatingStatus(false)
+      setIsDeleting(false)
     }
   }
 
@@ -94,7 +103,7 @@ export default function BudgetDetailPage() {
       <Button
         variant="ghost"
         className="pl-0"
-        onClick={() => router.back()}
+        onClick={() => router.push("/admin/budgets")}
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
         Volver a la lista
@@ -103,41 +112,47 @@ export default function BudgetDetailPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Detalle del Presupuesto #{budget.ID}</h1>
         <div className="flex items-center gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-sm font-medium text-muted-foreground">Estado del Presupuesto</label>
-            <Select
-              value={budget.status}
-              onValueChange={handleStatusChange}
-              disabled={isUpdatingStatus}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Seleccionar estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PENDIENTE">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                    PENDIENTE
-                  </div>
-                </SelectItem>
-                <SelectItem value="ACEPTADO">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    ACEPTADO
-                  </div>
-                </SelectItem>
-                <SelectItem value="DENEGADO">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                    DENEGADO
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {isUpdatingStatus && (
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-          )}
+          <Badge
+            className={`px-3 py-1 text-sm ${
+              budget.status === "ACEPTADO"
+                ? "bg-green-100 text-green-800"
+                : budget.status === "DENEGADO"
+                ? "bg-red-100 text-red-800"
+                : "bg-yellow-100 text-yellow-800"
+            }`}
+          >
+            {budget.status}
+          </Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push(`/admin/budgets/${budget._id}/edit`)}
+          >
+            <Edit className="mr-2 h-4 w-4" />
+            Editar
+          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={isDeleting}>
+                <Trash2 className="mr-2 h-4 w-4" />
+                {isDeleting ? "Eliminando..." : "Eliminar"}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta acción no se puede deshacer. Se eliminará permanentemente el presupuesto #{budget.ID}.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Eliminar
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -152,6 +167,14 @@ export default function BudgetDetailPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
+              <p className="text-sm text-muted-foreground">Cliente</p>
+              <p className="font-medium">{budget.customerName}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Email</p>
+              <p>{budget.email}</p>
+            </div>
+            <div>
               <p className="text-sm text-muted-foreground">Fecha del Presupuesto</p>
               <p>{formatDate(budget.budgetDate)}</p>
             </div>
@@ -162,6 +185,22 @@ export default function BudgetDetailPage() {
             <div>
               <p className="text-sm text-muted-foreground">Presupuesto Estimado</p>
               <p className="font-medium">{formatCurrency(budget.estimatedBudget, budget.currency)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Pago Adelantado</p>
+              <div className="flex items-center gap-2">
+                {budget.advancePayment ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <span>Sí</span>
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="h-4 w-4 text-red-500" />
+                    <span>No</span>
+                  </>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -219,6 +258,10 @@ export default function BudgetDetailPage() {
             <div>
               <p className="text-sm text-muted-foreground">Habitaciones</p>
               <p>{budget.rooms}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">ID de Trabajo</p>
+              <p className="font-mono text-sm">{budget.workId}</p>
             </div>
           </CardContent>
         </Card>
@@ -299,6 +342,24 @@ export default function BudgetDetailPage() {
                 <li key={index} className="capitalize">{sub}</li>
               ))}
               {budget?.subcontractors?.length === 0 && <li className="text-muted-foreground">No se requieren subcontratistas</li>}
+            </ul>
+          </CardContent>
+        </Card>
+
+        {/* Documentación */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-muted-foreground" />
+              <span>Documentación</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="list-disc pl-5 space-y-1">
+              {budget?.documentation?.map((doc: string, index: number) => (
+                <li key={index} className="capitalize">{doc}</li>
+              ))}
+              {budget?.documentation?.length === 0 && <li className="text-muted-foreground">No hay documentación adjunta</li>}
             </ul>
           </CardContent>
         </Card>

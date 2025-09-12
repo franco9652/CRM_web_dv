@@ -15,7 +15,7 @@ export default function ClientSidebar() {
   }
 
   return (
-    <div className={`border-r bg-background transition-all duration-300 ${collapsed ? "w-[70px]" : "w-[250px]"}`}>
+    <div id="client-sidebar" className={`border-r bg-background transition-all duration-300 ${collapsed ? "w-[70px]" : "w-[250px]"}`}>
       <div className="flex flex-col min-h-screen">
         <div className="flex h-14 items-center border-b px-4">
           <Link href="/client/dashboard" className="flex items-center gap-2 font-semibold">
@@ -29,6 +29,7 @@ export default function ClientSidebar() {
         <div className="flex-1 overflow-auto py-2">
           <nav className="grid items-start px-2 text-sm font-medium">
             <Link
+              id="client-projects-section"
               href="/client/projects"
               className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
                 isActive("/client/projects")
@@ -40,7 +41,8 @@ export default function ClientSidebar() {
               {!collapsed && <span>Proyectos</span>}
             </Link>
             <Link
-              href="/client/documents"
+              id="client-documents-section"
+                href="/client/documents"
               className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
                 isActive("/client/documents")
                   ? "bg-muted text-primary"
@@ -51,6 +53,7 @@ export default function ClientSidebar() {
               {!collapsed && <span>Documentos</span>}
             </Link>
             <Link
+              id="client-budgets-section"
               href="/client/budgets"
               className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
                 isActive("/client/budgets")
@@ -62,6 +65,7 @@ export default function ClientSidebar() {
               {!collapsed && <span>Presupuestos</span>}
             </Link>
             <Link
+              id="client-meetings-section"
               href="/client/meetings"
               className={`flex items-center gap-3 rounded-lg px-3 py-2 transition-all ${
                 isActive("/client/meetings")

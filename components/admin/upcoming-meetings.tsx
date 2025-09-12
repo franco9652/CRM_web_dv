@@ -6,66 +6,18 @@ import { Button } from "@/components/ui/button"
 import { Calendar, Clock, Users, Video } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "../auth-provider"
-import { getMeetingsByUsername } from "@/services/meetings"
-import { useEffect } from "react"
-
-// Datos de reuniones de ejemplo
-const meetings = [
-  {
-    id: 1,
-    title: "Inicio de Proyecto",
-    project: "Hotel Vista al Puerto",
-    client: "Oscorp",
-    date: "2024-03-20",
-    time: "10:00 AM",
-    duration: "1 hora",
-    type: "Videollamada",
-    attendees: 5,
-    link: "https://meet.google.com/abc-defg-hij",
-  },
-  {
-    id: 2,
-    title: "Revisión de Diseño",
-    project: "Torre Skyline",
-    client: "Inmobiliaria Vista",
-    date: "2024-03-22",
-    time: "2:00 PM",
-    duration: "1.5 horas",
-    type: "Presencial",
-    attendees: 8,
-  },
-  {
-    id: 3,
-    title: "Discusión de Presupuesto",
-    project: "Complejo Riverside",
-    client: "Desarrollos Globales",
-    date: "2024-03-25",
-    time: "11:00 AM",
-    duration: "1 hora",
-    type: "Videollamada",
-    attendees: 4,
-    link: "https://meet.google.com/xyz-uvwx-lmn",
-  },
-  {
-    id: 4,
-    title: "Actualización de Progreso",
-    project: "Parque Oficinas Metro",
-    client: "Corporación Stark",
-    date: "2024-03-28",
-    time: "3:30 PM",
-    duration: "45 minutos",
-    type: "Videollamada",
-    attendees: 6,
-    link: "https://meet.google.com/pqr-stu-vwx",
-  },
-]
+import { getAllMeetings } from "@/services/meetings"
+import { useEffect, useState } from "react"
+import { Meeting } from "@/services/meetings"
 
 export default function UpcomingMeetings() {
   const router = useRouter()
   const { user } = useAuth()
+  const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
+  const formatDate = (dateInput: string | Date) => {
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput)
     return new Intl.DateTimeFormat("es-ES", {
       year: "numeric",
       month: "short",
@@ -74,20 +26,26 @@ export default function UpcomingMeetings() {
   }
 
   const fetchMeetings = async () => {
-    if (!user?.role) {
-      return
-    }
     try {
-      const response = await getMeetingsByUsername(user.email)  
-      return response
+      setIsLoading(true)
+      const response = await getAllMeetings()
+      if (response && response.meetings) {
+        // Sort meetings by date (newest first)
+        const sortedMeetings = [...response.meetings].sort((a, b) => 
+          new Date(b.date).getTime() - new Date(a.date).getTime()
+        )
+        setMeetings(sortedMeetings)
+      }
     } catch (error) {
       console.error("Error al obtener las reuniones:", error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
   useEffect(() => {
     fetchMeetings()
-  }, [user])
+  }, [])
 
   return (
     <Card>
@@ -112,54 +70,72 @@ export default function UpcomingMeetings() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {meetings.map((meeting) => (
-                <TableRow key={meeting.id}>
-                  <TableCell className="font-medium">
-                    {meeting.title}
-                    <div className="text-xs text-muted-foreground">{meeting.client}</div>
-                  </TableCell>
-                  <TableCell>{meeting.project}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3 text-muted-foreground" />
-                        <span>{formatDate(meeting.date)}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3 text-muted-foreground" />
-                        <span>
-                          {meeting.time} ({meeting.duration})
-                        </span>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <div className="flex items-center gap-1">
-                      {meeting.type === "Videollamada" ? (
-                        <Video className="h-3 w-3 text-muted-foreground" />
-                      ) : (
-                        <Users className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      <span>{meeting.type}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">{meeting.attendees}</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (meeting.type === "Videollamada" && meeting.link) {
-                          window.open(meeting.link, "_blank")
-                        } else {
-                          router.push(`/admin/meetings/${meeting.id}`)
-                        }
-                      }}
-                    >
-                      Unirse
-                    </Button>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8">
+                    Cargando reuniones...
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : meetings.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    No hay reuniones programadas
+                  </TableCell>
+                </TableRow>
+              ) : (
+                meetings.map((meeting) => (
+                  <TableRow key={meeting._id}>
+                    <TableCell className="font-medium">
+                      {meeting.title}
+                      <div className="text-xs text-muted-foreground">{meeting.customer?.name || 'Sin cliente'}</div>
+                    </TableCell>
+                    <TableCell>{meeting.project?.title || meeting.project?.name || 'Sin proyecto'}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span>{formatDate(meeting.date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span>
+                            {meeting.time} ({meeting.duration})
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center gap-1">
+                        {meeting.meetingType?.toLowerCase() === 'virtual' ? (
+                          <Video className="h-3 w-3 text-muted-foreground" />
+                        ) : (
+                          <Users className="h-3 w-3 text-muted-foreground" />
+                        )}
+                        <span>{meeting.meetingType || 'No especificado'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      {meeting.participants?.length || 0}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          if (meeting.meetingType?.toLowerCase() === 'virtual' && meeting.meetingLink) {
+                            window.open(meeting.meetingLink, "_blank")
+                          } else if (meeting.meetingType?.toLowerCase() === 'presencial' && meeting.address) {
+                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(meeting.address)}`, "_blank")
+                          } else {
+                            router.push(`/admin/meetings/${meeting._id}`)
+                          }
+                        }}
+                      >
+                        {meeting.meetingType?.toLowerCase() === 'virtual' ? 'Unirse' : 'Ver detalles'}
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </div>

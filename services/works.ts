@@ -155,3 +155,16 @@ export async function updateWork(workId: string, workData: UpdateWorkInput): Pro
   const res = await axios.patch(`${API_URL}/workUpdate/${workId}`, workData);
   return res.data as Work;
 }
+
+export async function deleteWork(workId: string): Promise<{ message: string }> {
+  if (!workId) throw new Error("WorkId inválido");
+  try {
+    const res = await axios.delete(`${API_URL}/workDelete/${workId}`);
+    return res.data as { message: string };
+  } catch (error: any) {
+    if (error.response?.data?.error) {
+      throw new Error(error.response.data.error);
+    }
+    throw new Error('Error al conectar con el servidor');
+  }
+}
