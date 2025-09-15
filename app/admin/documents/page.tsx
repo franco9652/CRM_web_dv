@@ -41,6 +41,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import axios from 'axios';
 
 // Initialize with empty array as we'll fetch documents from the API
 const initialDocuments: Array<{

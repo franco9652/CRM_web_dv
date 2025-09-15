@@ -47,3 +47,27 @@ export async function loginUser(email: string, password: string): Promise<LoginR
     throw error;
   }
 }
+
+export async function recoverPassword(email: string): Promise<{ message: string }> {
+  try {
+    const response = await fetch(`${API_URL}/recovery`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    const responseText = await response.text();
+
+    if (!response.ok) {
+      throw new Error(responseText || "Error al solicitar recuperación");
+    }
+
+    const data = JSON.parse(responseText);
+    return data;
+  } catch (error) {
+    console.error(" Error en recuperación de contraseña:", error);
+    throw error;
+  }
+}

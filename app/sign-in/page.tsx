@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Building2 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import { recoverPassword } from "@/services/auth"
 
 export default function SignIn() {
   const router = useRouter()
@@ -18,6 +19,8 @@ export default function SignIn() {
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
+  const [isRecovering, setIsRecovering] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,6 +40,24 @@ export default function SignIn() {
       setError(error instanceof Error ? error.message : "Error al iniciar sesión")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleRecover = async () => {
+    setError("")
+    setSuccess("")
+    if (!email) {
+      setError("Ingresa tu correo para recuperarla")
+      return
+    }
+    try {
+      setIsRecovering(true)
+      const res = await recoverPassword(email)
+      setSuccess(res?.message || "Hemos enviado un correo con tu nueva contraseña")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo realizar la recuperación")
+    } finally {
+      setIsRecovering(false)
     }
   }
 
@@ -87,6 +108,19 @@ export default function SignIn() {
             </Button>
           </CardFooter>
         </form>
+        <div className="px-6 pb-6 -mt-2 flex items-center justify-between">
+          <button
+            type="button"
+            className="text-sm text-primary hover:underline disabled:opacity-50"
+            onClick={handleRecover}
+            disabled={isRecovering}
+          >
+            {isRecovering ? "Enviando correo..." : "¿Olvidaste tu contraseña?"}
+          </button>
+          {success && (
+            <span className="text-sm text-green-600">{success}</span>
+          )}
+        </div>
       </Card>
     </div>
   )
