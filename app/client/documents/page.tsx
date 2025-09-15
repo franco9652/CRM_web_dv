@@ -131,12 +131,18 @@ export default function ClientDocumentsPage() {
       } catch (err: any) {
         if(err?.status === 400){
           setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
+          toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
         } else if (err?.status === 404){
           setWorksError("No se encontraron proyectos")
+          // No mostrar toast de error para el caso específico de "No se encontraron presupuestos para este usuario"
+          // ya que es normal que clientes nuevos no tengan presupuestos aún
+          if (err?.message && !err.message.includes("No works found for this customer")) {
+            toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
+          }
         } else {
           setWorksError("Error al cargar los proyectos")
+          toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
         }
-        toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
       } finally {
         setLoadingWorks(false)
       }
