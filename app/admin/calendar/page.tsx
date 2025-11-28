@@ -31,7 +31,8 @@ import {
   createMeeting, 
   updateMeeting, 
   deleteMeeting, 
-  type Meeting 
+  type Meeting,
+  type CreateMeetingData
 } from "@/services/meetings"
 import { getWorksByCustomerId, type WorksByCustomerResponse, type Work } from "@/services/works"
 import { getAllCustomers, type Customer } from "@/services/customers"
@@ -215,8 +216,19 @@ export default function CalendarPage() {
     }
 
     try {
-      // Prepare data for API, removing fields not needed for creation
-      const { ...meetingDataForApi } = newMeeting;
+      // Prepare data for API - send only IDs for customer and project, and fix meeting type values
+      const meetingDataForApi: CreateMeetingData = {
+        title: newMeeting.title,
+        customer: newMeeting.customer._id, // Send only the ID
+        project: newMeeting.project._id,   // Send only the ID
+        date: newMeeting.date,
+        time: newMeeting.time,
+        duration: newMeeting.duration,
+        meetingType: newMeeting.meetingType === "Videollamada" ? "virtual" : "presencial", // Convert to backend values
+        meetingLink: newMeeting.meetingType === "Videollamada" ? newMeeting.meetingLink : undefined,
+        address: newMeeting.meetingType === "Presencial" ? newMeeting.address : undefined,
+        description: newMeeting.description,
+      };
       
       await createMeeting(meetingDataForApi);
       await fetchMeetingsAndUpdateState();
@@ -246,7 +258,21 @@ export default function CalendarPage() {
     if (!selectedMeeting?._id) return;
 
     try {
-      await updateMeeting(selectedMeeting._id, newMeeting);
+      // Prepare data for API - send only IDs for customer and project, and fix meeting type values
+      const meetingDataForApi: Partial<CreateMeetingData> = {
+        title: newMeeting.title,
+        customer: newMeeting.customer._id, // Send only the ID
+        project: newMeeting.project._id,   // Send only the ID
+        date: newMeeting.date,
+        time: newMeeting.time,
+        duration: newMeeting.duration,
+        meetingType: newMeeting.meetingType === "Videollamada" ? "virtual" : "presencial", // Convert to backend values
+        meetingLink: newMeeting.meetingType === "Videollamada" ? newMeeting.meetingLink : undefined,
+        address: newMeeting.meetingType === "Presencial" ? newMeeting.address : undefined,
+        description: newMeeting.description,
+      };
+      
+      await updateMeeting(selectedMeeting._id, meetingDataForApi);
       await fetchMeetingsAndUpdateState();
       
       resetForm();
@@ -395,7 +421,7 @@ setNewMeeting({
           date: new Date(meeting.date),
           time: meeting.time || '',
           duration: meeting.duration || '',
-          meetingType: meeting.meetingType || 'Presencial',
+          meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
           description: meeting.description || '',
           status: meeting.status || 'scheduled',
           meetingLink: meeting.meetingLink || '',
@@ -433,7 +459,7 @@ setNewMeeting({
           date: new Date(meeting.date),
           time: meeting.time || '',
           duration: meeting.duration || '',
-          meetingType: meeting.meetingType || 'Presencial',
+          meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
           description: meeting.description || '',
           status: meeting.status || 'scheduled',
           meetingLink: meeting.meetingLink || '',
@@ -466,7 +492,7 @@ setNewMeeting({
         date: new Date(meeting.date),
         time: meeting.time || '',
         duration: meeting.duration || '',
-        meetingType: meeting.meetingType || 'Presencial',
+        meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
         description: meeting.description || '',
         status: meeting.status || 'scheduled',
         meetingLink: meeting.meetingLink || '',
@@ -686,7 +712,7 @@ setNewMeeting({
                       <div className="text-xs text-muted-foreground">{meeting.description?.substring(0, 50) ?? ''}...</div>
                     </TableCell>
                     <TableCell>
-                      <div>{meeting.project.title}</div>
+                      <div>{meeting?.project?.title}</div>
                       <div className="text-xs text-muted-foreground">{meeting?.customer?.name}</div>
                     </TableCell>
                     <TableCell>
@@ -812,7 +838,11 @@ setNewMeeting({
                 <Label htmlFor="edit-customer">Cliente</Label>
                 <Select value={newMeeting.customer._id} onValueChange={(value) => {
                   const selectedCustomer = customers.find(c => c._id === value);
-                  if (selectedCustomer) setNewMeeting(prev => ({ ...prev, customer: selectedCustomer, project: { _id: "", title: "" } }));
+                  if (selectedCustomer) setNewMeeting(prev => ({ 
+                    ...prev, 
+                    customer: selectedCustomer, 
+                    project: { _id: "", title: "", name: "", ID: "", userId: [] } 
+                  }));
                 }}>
                   <SelectTrigger id="edit-customer"><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
                   <SelectContent>{customers.map((customer) => (<SelectItem key={customer._id} value={customer._id}>{customer.name}</SelectItem>))}</SelectContent>
@@ -827,7 +857,13 @@ setNewMeeting({
                     if (selectedProject) {
                       setNewMeeting(prev => ({
                         ...prev, 
-                        project: { _id: selectedProject._id, title: selectedProject.name }
+                        project: { 
+                          _id: selectedProject._id, 
+                          title: selectedProject.title || selectedProject.name || 'Sin título',
+                          name: selectedProject.name || selectedProject.title || 'Sin nombre',
+                          ID: selectedProject.ID || '',
+                          userId: selectedProject.userId || []
+                        }
                       }));
                     }
                   }} 
