@@ -65,7 +65,7 @@ export default function AdminHeader() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => router.push("/admin/profile")}>Mi Perfil</DropdownMenuItem>
-            {/* <DropdownMenuItem onClick={() => router.push("/admin/settings")}>Configuración</DropdownMenuItem> */}
+            <DropdownMenuItem onClick={() => router.push("/admin/settings")}>Configuración</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout}>Cerrar sesión</DropdownMenuItem>
           </DropdownMenuContent>

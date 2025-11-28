@@ -57,8 +57,8 @@ export default function ClientHeader() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
              <DropdownMenuItem onClick={() => router.push("/client/profile")}>Perfil de Empresa</DropdownMenuItem>
-            {/*<DropdownMenuItem onClick={() => router.push("/client/settings")}>Configuración</DropdownMenuItem>
-            <DropdownMenuSeparator /> */}
+            <DropdownMenuItem onClick={() => router.push("/client/settings")}>Configuración</DropdownMenuItem>
+            <DropdownMenuSeparator /> 
             <DropdownMenuItem onClick={logout}>Cerrar sesión</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
