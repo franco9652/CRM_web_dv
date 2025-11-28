@@ -712,7 +712,7 @@ export default function CalendarPage() {
                       <div className="text-xs text-muted-foreground">{meeting.description?.substring(0, 50) ?? ''}...</div>
                     </TableCell>
                     <TableCell>
-                      <div>{meeting?.project?.title}</div>
+                      <div>{meeting?.project?.name}</div>
                       <div className="text-xs text-muted-foreground">{meeting?.customer?.name}</div>
                     </TableCell>
                     <TableCell>
