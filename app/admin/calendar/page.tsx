@@ -64,7 +64,7 @@ export default function CalendarPage() {
     name: string;
     email: string;
   }>>([]);
-  
+
   const [projects, setProjects] = useState<Array<{
     _id: string;
     title: string;
@@ -80,12 +80,12 @@ export default function CalendarPage() {
     userId: string[];
   }>>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
-  
+
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [customerFilter, setCustomerFilter] = useState("Todos");
   const [typeFilter, setTypeFilter] = useState("Todos");
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -93,7 +93,7 @@ export default function CalendarPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  
+
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
   // Form state for adding/editing a meeting
@@ -123,7 +123,7 @@ export default function CalendarPage() {
   const fetchCustomers = useCallback(async () => {
     try {
       const allCustomers = await getAllCustomers();
-      
+
       // Map to the expected format for the calendar
       setCustomers(allCustomers.map(customer => ({
         _id: customer._id,
@@ -145,7 +145,7 @@ export default function CalendarPage() {
         const response = await getAllMeetings();
         const fetchedMeetings = response.meetings || [];
         setMeetings(fetchedMeetings);
-        
+
         // Derive unique projects from meetings
         const uniqueProjects = new Map<string, Meeting['project']>();
         fetchedMeetings.forEach(meeting => {
@@ -165,17 +165,17 @@ export default function CalendarPage() {
     fetchCustomers();
     fetchAndProcessMeetings();
   }, [fetchCustomers]);
-  
+
   // Filter meetings based on search term, customer, and meeting type
   const filteredMeetings = meetings.filter((meeting) => {
-    const matchesSearch = 
+    const matchesSearch =
       meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       meeting.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       meeting.project?.title.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
     const matchesCustomer = customerFilter === "Todos" || meeting.customer?.name === customerFilter;
     const matchesType = typeFilter === "Todos" || meeting.meetingType === typeFilter;
-    
+
     return matchesSearch && matchesCustomer && matchesType;
   });
 
@@ -183,7 +183,7 @@ export default function CalendarPage() {
   const totalPages = Math.ceil(filteredMeetings.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedMeetings = filteredMeetings.slice(startIndex, startIndex + itemsPerPage);
-  
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -232,13 +232,13 @@ export default function CalendarPage() {
       
       await createMeeting(meetingDataForApi);
       await fetchMeetingsAndUpdateState();
-      
+
       toast({
         title: "Reunión creada",
         description: "La reunión se ha creado correctamente.",
         variant: "default",
       });
-      
+
       resetForm();
       setIsAddDialogOpen(false);
     } catch (error) {
@@ -253,7 +253,7 @@ export default function CalendarPage() {
 
   // Handle editing a meeting
   const { toast } = useToast();
-  
+
   const handleEditMeeting = async () => {
     if (!selectedMeeting?._id) return;
 
@@ -274,10 +274,10 @@ export default function CalendarPage() {
       
       await updateMeeting(selectedMeeting._id, meetingDataForApi);
       await fetchMeetingsAndUpdateState();
-      
+
       resetForm();
       setIsEditDialogOpen(false);
-      
+
       toast({
         title: "Reunión actualizada",
         description: "La reunión se ha actualizado correctamente.",
@@ -300,7 +300,7 @@ export default function CalendarPage() {
     try {
       await deleteMeeting(selectedMeeting._id);
       await fetchMeetingsAndUpdateState();
-      
+
       setSelectedMeeting(null);
       setIsDeleteDialogOpen(false);
     } catch (error) {
@@ -383,7 +383,7 @@ export default function CalendarPage() {
   // Handle opening the edit dialog
   const openEditDialog = async (meeting: Meeting) => {
     setSelectedMeeting(meeting);
-    
+
     // If there's a customer, load their projects first
     if (meeting.customer?._id) {
       setLoadingProjects(true);
@@ -397,14 +397,14 @@ export default function CalendarPage() {
           ID: work.ID || '',
           userId: work.userId || []
         }));
-        
+
         setCustomerProjects(projects);
-        
+
         // Find the current project in the fetched projects
         const currentProject = projects.find(p => p._id === meeting.project?._id);
-        
+
         // Update the form with the meeting data and ensure the project is set correctly
-setNewMeeting({
+        setNewMeeting({
           title: meeting.title,
           customer: {
             _id: meeting.customer._id,
@@ -432,7 +432,7 @@ setNewMeeting({
           type: meeting.type || '',
           attendees: meeting.attendees
         });
-        
+
       } catch (error) {
         console.error('Error fetching projects:', error);
         toast({
@@ -440,9 +440,9 @@ setNewMeeting({
           description: "No se pudieron cargar los proyectos del cliente.",
           variant: "destructive",
         });
-        
+
         // Still set the meeting data even if projects fail to load
-setNewMeeting({
+        setNewMeeting({
           title: meeting.title,
           customer: {
             _id: meeting.customer._id,
@@ -548,8 +548,8 @@ setNewMeeting({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="customer">Cliente</Label>
-                <Select 
-                  value={newMeeting.customer._id} 
+                <Select
+                  value={newMeeting.customer._id}
                   onValueChange={handleCustomerChange}
                 >
                   <SelectTrigger id="customer">
@@ -566,15 +566,15 @@ setNewMeeting({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="project">Proyecto</Label>
-                <Select 
-                  value={newMeeting.project._id} 
+                <Select
+                  value={newMeeting.project._id}
                   onValueChange={(value) => {
                     const selectedProject = customerProjects.find(p => p._id === value);
                     if (selectedProject) {
                       setNewMeeting(prev => ({
-                        ...prev, 
-                        project: { 
-                          _id: selectedProject._id, 
+                        ...prev,
+                        project: {
+                          _id: selectedProject._id,
                           title: selectedProject.title || selectedProject.name || 'Sin título',
                           name: selectedProject.name || selectedProject.title || 'Sin nombre',
                           ID: selectedProject.ID || '',
@@ -582,7 +582,7 @@ setNewMeeting({
                         }
                       }));
                     }
-                  }} 
+                  }}
                   disabled={!newMeeting.customer._id || loadingProjects}
                 >
                   <SelectTrigger id="project">
@@ -766,7 +766,7 @@ setNewMeeting({
                 )}
               </TableBody>
             </Table>
-            
+
             {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4">
@@ -794,7 +794,7 @@ setNewMeeting({
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-                    
+
                     return (
                       <Button
                         key={pageNum}
