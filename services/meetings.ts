@@ -35,6 +35,20 @@ export interface Meeting {
   attendees?: number;
 }
 
+// Interface for creating/updating meetings (what the backend expects)
+export interface CreateMeetingData {
+  title: string;
+  customer: string; // Just the ID
+  project: string;  // Just the ID
+  date: Date | string;
+  time: string;
+  duration: string;
+  meetingType: string;
+  meetingLink?: string;
+  address?: string;
+  description?: string;
+}
+
 export interface MeetingsResponse {
   message: string;
   meetings: Meeting[];
@@ -80,11 +94,21 @@ export async function getMeetingsByUsername(username: string): Promise<MeetingsR
   }
 }
 
-export async function createMeeting(meetingData: Omit<Meeting, '_id'>): Promise<Meeting> {
+export async function createMeeting(meetingData: CreateMeetingData): Promise<Meeting> {
   try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw new Error('No authentication token found');
+    }
+    
     const response = await axios.post<Meeting>(
-      `${API_URL}/meetings`,
-      meetingData
+      `${API_URL}/meetingsCreate`,
+      meetingData,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      }
     );
     return response.data;
   } catch (error: any) {
@@ -93,7 +117,7 @@ export async function createMeeting(meetingData: Omit<Meeting, '_id'>): Promise<
   }
 }
 
-export async function updateMeeting(id: string, meetingData: Partial<Meeting>): Promise<Meeting> {
+export async function updateMeeting(id: string, meetingData: Partial<CreateMeetingData>): Promise<Meeting> {
   try {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -101,7 +125,7 @@ export async function updateMeeting(id: string, meetingData: Partial<Meeting>): 
     }
     
     const response = await axios.put<Meeting>(
-      `${API_URL}/meetings/${id}`,
+      `${API_URL}/meetingsUpdate/${id}`,
       meetingData,
       {
         headers: {
@@ -123,7 +147,7 @@ export async function deleteMeeting(id: string): Promise<void> {
       throw new Error('No authentication token found');
     }
     
-    await axios.delete(`${API_URL}/meetings/${id}`, {
+    await axios.delete(`${API_URL}/meetingsDelete/${id}`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }

@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar, Clock, Loader2, Search, Video } from "lucide-react"
+import { Calendar, Clock, Loader2, Search, Video, Edit, Trash, MoreHorizontal, Link, MapPin } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -16,28 +16,52 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { getMeetingsByUsername } from "@/services/meetings"
+import { getMeetingsByUsername, updateMeeting, deleteMeeting, type CreateMeetingData } from "@/services/meetings"
 import { getWorksByCustomerId } from "@/services/works"
 import { useAuth } from "@/components/auth-provider"
+import { useToast } from "@/hooks/use-toast"
 
 import type { Meeting } from "@/services/meetings";
 
 export default function ClientMeetingsPage() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const [meetings, setMeetings] = useState<Array<Partial<Meeting>>>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [projectFilter, setProjectFilter] = useState("Todos")
   const [typeFilter, setTypeFilter] = useState("Todos")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [selectedMeeting, setSelectedMeeting] = useState<Partial<Meeting> | null>(null)
   const [newMeeting, setNewMeeting] = useState({
     project: "",
     title: "",
     date: "",
     time: "",
     description: "",
+  })
+  const [editMeeting, setEditMeeting] = useState({
+    project: "",
+    title: "",
+    date: "",
+    time: "",
+    duration: "",
+    meetingType: "Presencial",
+    description: "",
+    meetingLink: "",
+    address: "",
   })
   const [projects, setProjects] = useState<Array<{id: string, name: string}>>([])
   const [loadingProjects, setLoadingProjects] = useState(false)
@@ -122,6 +146,120 @@ export default function ClientMeetingsPage() {
       description: "",
     })
   }
+
+  // Handle editing a meeting
+  const handleEditMeeting = async () => {
+    if (!selectedMeeting?._id) return;
+
+    try {
+      // Prepare data for API - send only IDs for customer and project, and fix meeting type values
+      const meetingDataForApi: Partial<CreateMeetingData> = {
+        title: editMeeting.title,
+        project: editMeeting.project,   // Send only the ID
+        date: new Date(editMeeting.date),
+        time: editMeeting.time,
+        duration: editMeeting.duration,
+        meetingType: editMeeting.meetingType === "Videollamada" ? "virtual" : "presencial", // Convert to backend values
+        meetingLink: editMeeting.meetingType === "Videollamada" ? editMeeting.meetingLink : undefined,
+        address: editMeeting.meetingType === "Presencial" ? editMeeting.address : undefined,
+        description: editMeeting.description,
+      };
+      
+      await updateMeeting(selectedMeeting._id, meetingDataForApi);
+      
+      // Refresh meetings list
+      const response = await getMeetingsByUsername(user?.email || "");
+      if (response && response.meetings) {
+        setMeetings(response.meetings);
+      }
+      
+      toast({
+        title: "Reunión actualizada",
+        description: "La reunión se ha actualizado correctamente.",
+        variant: "default",
+      });
+      
+      resetEditForm();
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error('Error updating meeting:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar la reunión. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // Handle deleting a meeting
+  const handleDeleteMeeting = async () => {
+    if (!selectedMeeting?._id) return;
+
+    try {
+      await deleteMeeting(selectedMeeting._id);
+      
+      // Refresh meetings list
+      const response = await getMeetingsByUsername(user?.email || "");
+      if (response && response.meetings) {
+        setMeetings(response.meetings);
+      }
+      
+      toast({
+        title: "Reunión eliminada",
+        description: "La reunión se ha eliminado correctamente.",
+        variant: "default",
+      });
+      
+      setSelectedMeeting(null);
+      setIsDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Error deleting meeting:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la reunión. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // Reset the edit form to initial state
+  const resetEditForm = () => {
+    setEditMeeting({
+      project: "",
+      title: "",
+      date: "",
+      time: "",
+      duration: "",
+      meetingType: "Presencial",
+      description: "",
+      meetingLink: "",
+      address: "",
+    });
+    setSelectedMeeting(null);
+  }
+
+  // Handle opening the edit dialog
+  const openEditDialog = (meeting: Partial<Meeting>) => {
+    setSelectedMeeting(meeting);
+    setEditMeeting({
+      project: meeting.project?._id || "",
+      title: meeting.title || "",
+      date: meeting.date ? (typeof meeting.date === 'string' ? meeting.date.split('T')[0] : new Date(meeting.date).toISOString().split('T')[0]) : "",
+      time: meeting.time || "",
+      duration: meeting.duration || "",
+      meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
+      description: meeting.description || "",
+      meetingLink: meeting.meetingLink || "",
+      address: meeting.address || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  // Handle opening the delete dialog
+  const openDeleteDialog = (meeting: Partial<Meeting>) => {
+    setSelectedMeeting(meeting);
+    setIsDeleteDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -236,31 +374,6 @@ export default function ClientMeetingsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filtrar por proyecto" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todos los proyectos</SelectItem>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filtrar por tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                {meetingTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="rounded-md border">
             <Table>
@@ -301,24 +414,70 @@ export default function ClientMeetingsPage() {
                           <div>
                             <div className="font-medium">{meeting.title}</div>
                             <div className="text-sm text-muted-foreground">
-                              {meeting.project ? meeting.project.name : 'Sin proyecto'}
+                              {meeting.description?.substring(0, 50) ?? ''}...
                             </div>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{formatDate(meeting?.date || '')}</TableCell>
-                      <TableCell>{meeting.time}</TableCell>
-                      <TableCell>{meeting.duration}</TableCell>
                       <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            meeting.meetingType === "Videollamada"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-green-100 text-green-800"
-                          }`}
-                        >
-                          {meeting.meetingType}
-                        </span>
+                        <div>{meeting.project ? meeting.project.name : 'Sin proyecto'}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {meeting.customer ? meeting.customer.name : 'Sin cliente'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3 text-muted-foreground" />
+                            <span>{formatDate(meeting?.date || '')}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="h-3 w-3 text-muted-foreground" />
+                            <span>{meeting.time} ({meeting.duration})</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        <div className="flex items-center gap-1">
+                          {meeting.meetingType === "Videollamada" ? <Video className="h-3 w-3 text-muted-foreground" /> : <MapPin className="h-3 w-3 text-muted-foreground" />}
+                          <span>{meeting.meetingType}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {meeting.meetingType === "Videollamada" ? (
+                            <div className="flex items-center gap-1">
+                              <Link className="h-3 w-3" />
+                              <span className="truncate max-w-[150px]">{meeting.meetingLink}</span>
+                            </div>
+                          ) : ( meeting.address )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Abrir menú</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => openEditDialog(meeting)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar Reunión
+                            </DropdownMenuItem>
+                            {meeting.meetingType === "Videollamada" && meeting.meetingLink && (
+                              <DropdownMenuItem onClick={() => window.open(meeting.meetingLink, "_blank")}>
+                                <Video className="mr-2 h-4 w-4" />
+                                Unirse a la Reunión
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => openDeleteDialog(meeting)}>
+                              <Trash className="mr-2 h-4 w-4" />
+                              Cancelar Reunión
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -337,6 +496,157 @@ export default function ClientMeetingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Meeting Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={(isOpen) => { setIsEditDialogOpen(isOpen); if (!isOpen) resetEditForm(); }}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Editar Reunión</DialogTitle>
+            <DialogDescription>
+              Modifica los detalles de la reunión programada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-title">Título de la Reunión</Label>
+              <Input
+                id="edit-title"
+                value={editMeeting.title}
+                onChange={(e) => setEditMeeting({ ...editMeeting, title: e.target.value })}
+                placeholder="Ej: Revisión de Diseño"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-project">Proyecto</Label>
+              <Select
+                value={editMeeting.project}
+                onValueChange={(value) => setEditMeeting({ ...editMeeting, project: value })}
+              >
+                <SelectTrigger id="edit-project">
+                  <SelectValue placeholder="Seleccionar proyecto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingProjects ? (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">Cargando proyectos...</div>
+                  ) : projects.length > 0 ? (
+                    projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">No hay proyectos disponibles</div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-date">Fecha</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editMeeting.date}
+                  onChange={(e) => setEditMeeting({ ...editMeeting, date: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-time">Hora</Label>
+                <Input
+                  id="edit-time"
+                  type="time"
+                  value={editMeeting.time}
+                  onChange={(e) => setEditMeeting({ ...editMeeting, time: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-duration">Duración</Label>
+                <Input
+                  id="edit-duration"
+                  placeholder="Ej: 1 hora"
+                  value={editMeeting.duration}
+                  onChange={(e) => setEditMeeting({ ...editMeeting, duration: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-meetingType">Tipo de Reunión</Label>
+                <Select
+                  value={editMeeting.meetingType}
+                  onValueChange={(value) => setEditMeeting({ ...editMeeting, meetingType: value })}
+                >
+                  <SelectTrigger id="edit-meetingType">
+                    <SelectValue placeholder="Seleccionar tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Videollamada">Videollamada</SelectItem>
+                    <SelectItem value="Presencial">Presencial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {editMeeting.meetingType === "Presencial" ? (
+              <div className="grid gap-2">
+                <Label htmlFor="edit-address">Ubicación</Label>
+                <Input
+                  id="edit-address"
+                  placeholder="Ej: Oficina Central, Sala de Juntas"
+                  value={editMeeting.address}
+                  onChange={(e) => setEditMeeting({ ...editMeeting, address: e.target.value })}
+                />
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label htmlFor="edit-meetingLink">Enlace de la Reunión</Label>
+                <Input
+                  id="edit-meetingLink"
+                  placeholder="Ej: https://meet.google.com/abc-defg-hij"
+                  value={editMeeting.meetingLink}
+                  onChange={(e) => setEditMeeting({ ...editMeeting, meetingLink: e.target.value })}
+                />
+              </div>
+            )}
+            <div className="grid gap-2">
+              <Label htmlFor="edit-description">Descripción</Label>
+              <Textarea
+                id="edit-description"
+                placeholder="Detalles adicionales sobre la reunión"
+                value={editMeeting.description}
+                onChange={(e) => setEditMeeting({ ...editMeeting, description: e.target.value })}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleEditMeeting}>
+              Guardar Cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Meeting Dialog */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar Reunión</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas cancelar esta reunión? Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
+              No, Mantener
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteMeeting}>
+              Sí, Cancelar Reunión
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

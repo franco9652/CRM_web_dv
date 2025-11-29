@@ -31,7 +31,8 @@ import {
   createMeeting, 
   updateMeeting, 
   deleteMeeting, 
-  type Meeting 
+  type Meeting,
+  type CreateMeetingData
 } from "@/services/meetings"
 import { getWorksByCustomerId, type WorksByCustomerResponse, type Work } from "@/services/works"
 import { getAllCustomers, type Customer } from "@/services/customers"
@@ -63,7 +64,7 @@ export default function CalendarPage() {
     name: string;
     email: string;
   }>>([]);
-  
+
   const [projects, setProjects] = useState<Array<{
     _id: string;
     title: string;
@@ -79,12 +80,12 @@ export default function CalendarPage() {
     userId: string[];
   }>>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
-  
+
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [customerFilter, setCustomerFilter] = useState("Todos");
   const [typeFilter, setTypeFilter] = useState("Todos");
-  
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -92,7 +93,7 @@ export default function CalendarPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  
+
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
 
   // Form state for adding/editing a meeting
@@ -122,7 +123,7 @@ export default function CalendarPage() {
   const fetchCustomers = useCallback(async () => {
     try {
       const allCustomers = await getAllCustomers();
-      
+
       // Map to the expected format for the calendar
       setCustomers(allCustomers.map(customer => ({
         _id: customer._id,
@@ -144,7 +145,7 @@ export default function CalendarPage() {
         const response = await getAllMeetings();
         const fetchedMeetings = response.meetings || [];
         setMeetings(fetchedMeetings);
-        
+
         // Derive unique projects from meetings
         const uniqueProjects = new Map<string, Meeting['project']>();
         fetchedMeetings.forEach(meeting => {
@@ -164,17 +165,17 @@ export default function CalendarPage() {
     fetchCustomers();
     fetchAndProcessMeetings();
   }, [fetchCustomers]);
-  
+
   // Filter meetings based on search term, customer, and meeting type
   const filteredMeetings = meetings.filter((meeting) => {
-    const matchesSearch = 
+    const matchesSearch =
       meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       meeting.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       meeting.project?.title.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
     const matchesCustomer = customerFilter === "Todos" || meeting.customer?.name === customerFilter;
     const matchesType = typeFilter === "Todos" || meeting.meetingType === typeFilter;
-    
+
     return matchesSearch && matchesCustomer && matchesType;
   });
 
@@ -182,7 +183,7 @@ export default function CalendarPage() {
   const totalPages = Math.ceil(filteredMeetings.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedMeetings = filteredMeetings.slice(startIndex, startIndex + itemsPerPage);
-  
+
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -215,18 +216,29 @@ export default function CalendarPage() {
     }
 
     try {
-      // Prepare data for API, removing fields not needed for creation
-      const { ...meetingDataForApi } = newMeeting;
+      // Prepare data for API - send only IDs for customer and project, and fix meeting type values
+      const meetingDataForApi: CreateMeetingData = {
+        title: newMeeting.title,
+        customer: newMeeting.customer._id, // Send only the ID
+        project: newMeeting.project._id,   // Send only the ID
+        date: newMeeting.date,
+        time: newMeeting.time,
+        duration: newMeeting.duration,
+        meetingType: newMeeting.meetingType === "Videollamada" ? "virtual" : "presencial", // Convert to backend values
+        meetingLink: newMeeting.meetingType === "Videollamada" ? newMeeting.meetingLink : undefined,
+        address: newMeeting.meetingType === "Presencial" ? newMeeting.address : undefined,
+        description: newMeeting.description,
+      };
       
       await createMeeting(meetingDataForApi);
       await fetchMeetingsAndUpdateState();
-      
+
       toast({
         title: "Reunión creada",
         description: "La reunión se ha creado correctamente.",
         variant: "default",
       });
-      
+
       resetForm();
       setIsAddDialogOpen(false);
     } catch (error) {
@@ -241,17 +253,31 @@ export default function CalendarPage() {
 
   // Handle editing a meeting
   const { toast } = useToast();
-  
+
   const handleEditMeeting = async () => {
     if (!selectedMeeting?._id) return;
 
     try {
-      await updateMeeting(selectedMeeting._id, newMeeting);
-      await fetchMeetingsAndUpdateState();
+      // Prepare data for API - send only IDs for customer and project, and fix meeting type values
+      const meetingDataForApi: Partial<CreateMeetingData> = {
+        title: newMeeting.title,
+        customer: newMeeting.customer._id, // Send only the ID
+        project: newMeeting.project._id,   // Send only the ID
+        date: newMeeting.date,
+        time: newMeeting.time,
+        duration: newMeeting.duration,
+        meetingType: newMeeting.meetingType === "Videollamada" ? "virtual" : "presencial", // Convert to backend values
+        meetingLink: newMeeting.meetingType === "Videollamada" ? newMeeting.meetingLink : undefined,
+        address: newMeeting.meetingType === "Presencial" ? newMeeting.address : undefined,
+        description: newMeeting.description,
+      };
       
+      await updateMeeting(selectedMeeting._id, meetingDataForApi);
+      await fetchMeetingsAndUpdateState();
+
       resetForm();
       setIsEditDialogOpen(false);
-      
+
       toast({
         title: "Reunión actualizada",
         description: "La reunión se ha actualizado correctamente.",
@@ -274,7 +300,7 @@ export default function CalendarPage() {
     try {
       await deleteMeeting(selectedMeeting._id);
       await fetchMeetingsAndUpdateState();
-      
+
       setSelectedMeeting(null);
       setIsDeleteDialogOpen(false);
     } catch (error) {
@@ -357,7 +383,7 @@ export default function CalendarPage() {
   // Handle opening the edit dialog
   const openEditDialog = async (meeting: Meeting) => {
     setSelectedMeeting(meeting);
-    
+
     // If there's a customer, load their projects first
     if (meeting.customer?._id) {
       setLoadingProjects(true);
@@ -371,14 +397,14 @@ export default function CalendarPage() {
           ID: work.ID || '',
           userId: work.userId || []
         }));
-        
+
         setCustomerProjects(projects);
-        
+
         // Find the current project in the fetched projects
         const currentProject = projects.find(p => p._id === meeting.project?._id);
-        
+
         // Update the form with the meeting data and ensure the project is set correctly
-setNewMeeting({
+        setNewMeeting({
           title: meeting.title,
           customer: {
             _id: meeting.customer._id,
@@ -395,7 +421,7 @@ setNewMeeting({
           date: new Date(meeting.date),
           time: meeting.time || '',
           duration: meeting.duration || '',
-          meetingType: meeting.meetingType || 'Presencial',
+          meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
           description: meeting.description || '',
           status: meeting.status || 'scheduled',
           meetingLink: meeting.meetingLink || '',
@@ -406,7 +432,7 @@ setNewMeeting({
           type: meeting.type || '',
           attendees: meeting.attendees
         });
-        
+
       } catch (error) {
         console.error('Error fetching projects:', error);
         toast({
@@ -414,9 +440,9 @@ setNewMeeting({
           description: "No se pudieron cargar los proyectos del cliente.",
           variant: "destructive",
         });
-        
+
         // Still set the meeting data even if projects fail to load
-setNewMeeting({
+        setNewMeeting({
           title: meeting.title,
           customer: {
             _id: meeting.customer._id,
@@ -433,7 +459,7 @@ setNewMeeting({
           date: new Date(meeting.date),
           time: meeting.time || '',
           duration: meeting.duration || '',
-          meetingType: meeting.meetingType || 'Presencial',
+          meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
           description: meeting.description || '',
           status: meeting.status || 'scheduled',
           meetingLink: meeting.meetingLink || '',
@@ -466,7 +492,7 @@ setNewMeeting({
         date: new Date(meeting.date),
         time: meeting.time || '',
         duration: meeting.duration || '',
-        meetingType: meeting.meetingType || 'Presencial',
+        meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
         description: meeting.description || '',
         status: meeting.status || 'scheduled',
         meetingLink: meeting.meetingLink || '',
@@ -522,8 +548,8 @@ setNewMeeting({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="customer">Cliente</Label>
-                <Select 
-                  value={newMeeting.customer._id} 
+                <Select
+                  value={newMeeting.customer._id}
                   onValueChange={handleCustomerChange}
                 >
                   <SelectTrigger id="customer">
@@ -540,15 +566,15 @@ setNewMeeting({
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="project">Proyecto</Label>
-                <Select 
-                  value={newMeeting.project._id} 
+                <Select
+                  value={newMeeting.project._id}
                   onValueChange={(value) => {
                     const selectedProject = customerProjects.find(p => p._id === value);
                     if (selectedProject) {
                       setNewMeeting(prev => ({
-                        ...prev, 
-                        project: { 
-                          _id: selectedProject._id, 
+                        ...prev,
+                        project: {
+                          _id: selectedProject._id,
                           title: selectedProject.title || selectedProject.name || 'Sin título',
                           name: selectedProject.name || selectedProject.title || 'Sin nombre',
                           ID: selectedProject.ID || '',
@@ -556,7 +582,7 @@ setNewMeeting({
                         }
                       }));
                     }
-                  }} 
+                  }}
                   disabled={!newMeeting.customer._id || loadingProjects}
                 >
                   <SelectTrigger id="project">
@@ -686,7 +712,7 @@ setNewMeeting({
                       <div className="text-xs text-muted-foreground">{meeting.description?.substring(0, 50) ?? ''}...</div>
                     </TableCell>
                     <TableCell>
-                      <div>{meeting.project.title}</div>
+                      <div>{meeting?.project?.name}</div>
                       <div className="text-xs text-muted-foreground">{meeting?.customer?.name}</div>
                     </TableCell>
                     <TableCell>
@@ -740,7 +766,7 @@ setNewMeeting({
                 )}
               </TableBody>
             </Table>
-            
+
             {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-6 py-4">
@@ -768,7 +794,7 @@ setNewMeeting({
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-                    
+
                     return (
                       <Button
                         key={pageNum}
@@ -812,7 +838,11 @@ setNewMeeting({
                 <Label htmlFor="edit-customer">Cliente</Label>
                 <Select value={newMeeting.customer._id} onValueChange={(value) => {
                   const selectedCustomer = customers.find(c => c._id === value);
-                  if (selectedCustomer) setNewMeeting(prev => ({ ...prev, customer: selectedCustomer, project: { _id: "", title: "" } }));
+                  if (selectedCustomer) setNewMeeting(prev => ({ 
+                    ...prev, 
+                    customer: selectedCustomer, 
+                    project: { _id: "", title: "", name: "", ID: "", userId: [] } 
+                  }));
                 }}>
                   <SelectTrigger id="edit-customer"><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
                   <SelectContent>{customers.map((customer) => (<SelectItem key={customer._id} value={customer._id}>{customer.name}</SelectItem>))}</SelectContent>
@@ -827,7 +857,13 @@ setNewMeeting({
                     if (selectedProject) {
                       setNewMeeting(prev => ({
                         ...prev, 
-                        project: { _id: selectedProject._id, title: selectedProject.name }
+                        project: { 
+                          _id: selectedProject._id, 
+                          title: selectedProject.title || selectedProject.name || 'Sin título',
+                          name: selectedProject.name || selectedProject.title || 'Sin nombre',
+                          ID: selectedProject.ID || '',
+                          userId: selectedProject.userId || []
+                        }
                       }));
                     }
                   }} 

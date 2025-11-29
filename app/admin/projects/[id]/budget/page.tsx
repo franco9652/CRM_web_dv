@@ -160,7 +160,7 @@ export default function ProjectBudgetsPage() {
                         {budget.materials && budget.materials.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {budget.materials.slice(0, 3).map((material, index) => (
-                              <span key={index} className="text-xs bg-gray-100 px-2 py-1 rounded">
+                              <span key={index} className="text-xs bg-gray-400 px-2 py-1 rounded">
                                 {material}
                               </span>
                             ))}

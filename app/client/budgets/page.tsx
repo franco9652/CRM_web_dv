@@ -28,24 +28,52 @@ export default function ClientBudgetsPage() {
 
   useEffect(() => {
     const fetchBudgets = async () => {
-      if (!user?.customerId) {
+
+      console.log('user: ', user)
+      if (user?.role === "employee") {
+        try {
+          const response: BudgetsResponse = await getBudgetsByCustomerId(user?.id)
+          setBudgets(response.budgets || [])
+        } catch (error:any) {
+          if(error?.status === 400){
+            toast({ title: "Error", description: error?.message || "No se pudieron cargar los presupuestos", variant: "destructive" })
+          } else if(error?.status === 404){
+            if (error && !error.includes("No se encontraron presupuestos para este usuario")) {
+              toast({ title: "Error", description: error || "No se pudieron cargar los presupuestos", variant: "destructive" })
+            }
+          } else {
+            console.error("Error al cargar los presupuestos:", error)
+            toast({ title: "Error", description: error?.message || "No se pudieron cargar los presupuestos", variant: "destructive" })
+          }
+        } finally {
+          setIsLoading(false)
+        }
+      }
+      else if (!user?.customerId) {
         setIsLoading(false)
         return
       }
+      else {
 
       try {
         const response: BudgetsResponse = await getBudgetsByCustomerId(user.customerId)
         setBudgets(response.budgets || [])
-      } catch (error) {
-        toast({
-          title: "Error",
-          description: "No se pudieron cargar los presupuestos",
-          variant: "destructive",
-        })
+      } catch (error:any) {
+        if(error?.status === 400){
+          toast({ title: "Error", description: error?.message || "No se pudieron cargar los presupuestos", variant: "destructive" })
+        } else if(error?.status === 404){
+          if (error && !error.includes("No se encontraron presupuestos para este usuario")) {
+            toast({ title: "Error", description: error || "No se pudieron cargar los presupuestos", variant: "destructive" })
+          }
+        } else {
+          console.error("Error al cargar los presupuestos:", error)
+          toast({ title: "Error", description: error?.message || "No se pudieron cargar los presupuestos", variant: "destructive" })
+        }
       } finally {
         setIsLoading(false)
       }
     }
+  }
 
     fetchBudgets()
   }, [toast, user?.customerId])

@@ -38,11 +38,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
     const token = localStorage.getItem("token")
-    if (storedUser && token) {
-      setUser(JSON.parse(storedUser))
+    const loginTimestamp = localStorage.getItem("loginTimestamp")
+
+    if (storedUser && token && loginTimestamp) {
+      // Verificar si la sesión ha expirado (2 horas = 7200000 ms)
+      const now = Date.now()
+      const sessionDuration = now - parseInt(loginTimestamp, 10)
+      const twoHoursInMs = 2 * 60 * 60 * 1000 // 2 horas en milisegundos
+
+      if (sessionDuration < twoHoursInMs) {
+        // La sesión aún es válida
+        setUser(JSON.parse(storedUser))
+      } else {
+        // La sesión ha expirado, limpiar datos
+        localStorage.removeItem("user")
+        localStorage.removeItem("token")
+        localStorage.removeItem("loginTimestamp")
+        setUser(null)
+      }
     }
     setIsLoading(false)
   }, [])
+
+  // Verificar periódicamente si la sesión ha expirado
+  useEffect(() => {
+    if (!user) return
+
+    const checkSessionExpiration = () => {
+      const loginTimestamp = localStorage.getItem("loginTimestamp")
+      if (!loginTimestamp) {
+        logout()
+        return
+      }
+
+      const now = Date.now()
+      const sessionDuration = now - parseInt(loginTimestamp, 10)
+      const twoHoursInMs = 2 * 60 * 60 * 1000
+
+      if (sessionDuration >= twoHoursInMs) {
+        // Sesión expirada
+        alert("Tu sesión ha expirado. Por favor, inicia sesión nuevamente.")
+        logout()
+      }
+    }
+
+    // Verificar cada minuto
+    const intervalId = setInterval(checkSessionExpiration, 60000)
+
+    return () => clearInterval(intervalId)
+  }, [user])
 
   // Protect routes based on authentication
   useEffect(() => {
@@ -69,9 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const response = await loginUser(email, password)
-      
-      // Guardar el token
+
+      // Guardar el token y el timestamp de inicio de sesión
       localStorage.setItem("token", response.token)
+      localStorage.setItem("loginTimestamp", Date.now().toString())
 
       const userData: User = {
         id: response.userId,
@@ -99,6 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = () => {
     localStorage.removeItem("user")
     localStorage.removeItem("token")
+    localStorage.removeItem("loginTimestamp")
     setUser(null)
     router.push("/sign-in")
   }
