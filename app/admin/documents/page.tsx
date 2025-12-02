@@ -73,14 +73,13 @@ export default function DocumentsPage() {
   // State for documents and filters
   const [documents, setDocuments] = useState(initialDocuments);
   const [searchTerm, setSearchTerm] = useState("");
-  const [projectFilter, setProjectFilter] = useState("Todos");
-  const [categoryFilter, setCategoryFilter] = useState("Todas");
-  
+
+
   // Upload related state
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  
+
   // Auth and user state
   const [token, setToken] = useState<string | null>(null);
   const { user } = useAuth();
@@ -89,15 +88,15 @@ export default function DocumentsPage() {
   // Customers state
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
-  
+
   // Selected customer and works state
   const [selectedCustomer, setSelectedCustomer] = useState("");
-  const [customerWorks, setCustomerWorks] = useState<Array<{_id: string, name: string}>>([]);
+  const [customerWorks, setCustomerWorks] = useState<Array<{ _id: string, name: string }>>([]);
   const [isLoadingWorks, setIsLoadingWorks] = useState(false);
-  
+
   // Delete document state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [documentToDelete, setDocumentToDelete] = useState<{customerId: string, fileName: string, documentName: string, documentId: string} | null>(null);
+  const [documentToDelete, setDocumentToDelete] = useState<{ customerId: string, fileName: string, documentName: string, documentId: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [newDocument, setNewDocument] = useState({
@@ -108,14 +107,6 @@ export default function DocumentsPage() {
     file: null as File | null,
     url: ""
   })
-
-  const filteredDocuments = documents.filter(
-    (document) =>
-      (document.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        document.project.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (projectFilter === "Todos" || document.project === projectFilter) &&
-      (categoryFilter === "Todas" || document.category === categoryFilter),
-  )
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -139,11 +130,6 @@ export default function DocumentsPage() {
     }
   }
 
-  // Extraer proyectos únicos para el filtro
-  const projects = ["Todos", ...Array.from(new Set(documents.map((doc) => doc.project)))]
-
-  // Extraer categorías únicas para el filtro
-  const categories = ["Todas", ...Array.from(new Set(documents.map((doc) => doc.category)))]
 
   useEffect(() => {
     // Get token from localStorage
@@ -155,7 +141,7 @@ export default function DocumentsPage() {
     // Fetch customers
     const fetchCustomers = async () => {
       if (!authToken) return;
-      
+
       setIsLoadingCustomers(true);
       try {
         const customers = await getAllCustomers();
@@ -207,7 +193,7 @@ export default function DocumentsPage() {
         console.error('Error fetching customer works:', error);
         toast({
           title: 'Error',
-          description: 'No se pudieron cargar los proyectos del cliente',
+          description: 'No hay proyectos para este cliente',
           variant: 'destructive',
         });
         setCustomerWorks([]);
@@ -232,8 +218,8 @@ export default function DocumentsPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setNewDocument({ 
-        ...newDocument, 
+      setNewDocument({
+        ...newDocument,
         file: e.target.files[0],
         url: '' // Initialize with empty string, will be set after upload
       })
@@ -244,18 +230,18 @@ export default function DocumentsPage() {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error('No se pudo descargar el archivo');
-      
+
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      
+
       link.href = downloadUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
-      
+
       toast({
         title: "Descarga iniciada",
         description: `El archivo ${fileName} se está descargando.`,
@@ -324,7 +310,7 @@ export default function DocumentsPage() {
       }
 
       // Update customers state to remove the deleted document
-      setCustomers(prevCustomers => 
+      setCustomers(prevCustomers =>
         prevCustomers.map(customer => {
           if (customer._id === documentToDelete.customerId) {
             return {
@@ -412,7 +398,7 @@ export default function DocumentsPage() {
       })
 
       const uploadedFiles = await Promise.all(uploadPromises)
-      
+
       // Update documents state with new files
       const newDocs = uploadedFiles.map((file, index) => ({
         id: documents.length + index + 1,
@@ -428,13 +414,13 @@ export default function DocumentsPage() {
       }))
 
       setDocuments(prev => [...prev, ...newDocs])
-      
+
       toast({
         title: 'Éxito',
         description: 'Documentos subidos correctamente',
         variant: 'default',
       })
-      
+
       // Reset form
       setNewDocument({
         name: "",
@@ -444,7 +430,7 @@ export default function DocumentsPage() {
         file: null,
         url: ""
       })
-      
+
     } catch (error) {
       console.error('Error uploading file:', error)
       toast({
@@ -468,7 +454,7 @@ export default function DocumentsPage() {
       });
       return;
     }
-    
+
     const fileInput = document.getElementById('file-upload') as HTMLInputElement;
     if (fileInput && fileInput.files && fileInput.files.length > 0) {
       const event = { target: fileInput } as unknown as React.ChangeEvent<HTMLInputElement>;
@@ -506,8 +492,8 @@ export default function DocumentsPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="customer-select">Cliente</Label>
-                <Select 
-                  value={selectedCustomer} 
+                <Select
+                  value={selectedCustomer}
                   onValueChange={setSelectedCustomer}
                   required
                 >
@@ -537,9 +523,9 @@ export default function DocumentsPage() {
                   >
                     <SelectTrigger id="doc-project">
                       <SelectValue placeholder={
-                        !selectedCustomer 
-                          ? "Primero seleccione un cliente" 
-                          : isLoadingWorks 
+                        !selectedCustomer
+                          ? "Primero seleccione un cliente"
+                          : isLoadingWorks
                             ? "Cargando proyectos..."
                             : customerWorks.length === 0
                               ? "No hay proyectos para este cliente"
@@ -588,7 +574,7 @@ export default function DocumentsPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="file-upload">Archivo</Label>
-                <Input 
+                <Input
                   id="file-upload"
                   type="file"
                   onChange={(e) => {
@@ -602,8 +588,8 @@ export default function DocumentsPage() {
                 </p>
                 {isUploading && (
                   <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                    <div
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
                   </div>
@@ -611,14 +597,14 @@ export default function DocumentsPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setIsUploadDialogOpen(false)}
                 disabled={isUploading}
               >
                 Cancelar
               </Button>
-              <Button 
+              <Button
                 onClick={() => document.getElementById('file-upload')?.click()}
                 disabled={isUploading || !selectedCustomer || !newDocument.project}
               >
@@ -647,36 +633,12 @@ export default function DocumentsPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar documentos..."
+                placeholder="Buscar por cliente, archivo o trabajo..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filtrar por proyecto" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project} value={project}>
-                    {project}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filtrar por categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="rounded-md border">
             <Table>
@@ -689,80 +651,96 @@ export default function DocumentsPage() {
               </TableHeader>
               <TableBody>
                 {customers
-                  .filter(customer => customer.documents && customer.documents.length > 0)
+                  .filter(customer => {
+                    // First check if customer has documents
+                    if (!customer.documents || customer.documents.length === 0) return false;
+
+                    // If no search term, show all customers with documents
+                    if (!searchTerm) return true;
+
+                    // Check if customer name matches search term
+                    const customerNameMatch = customer.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+                    // Check if any document matches search term (by name or project)
+                    const documentMatch = customer.documents.some((doc: any) =>
+                      doc.name.toLowerCase().includes(searchTerm.toLowerCase())
+                    );
+
+                    return customerNameMatch || documentMatch;
+                  })
                   .map((customer) => (
-                  <TableRow key={customer._id}>
-                    <TableCell className="font-medium align-top pt-6">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        {customer.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {customer.documents && customer.documents.length > 0 ? (
-                        <div className="space-y-2">
-                          {customer.documents.map((doc) => (
-                            <div key={doc._id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded">
-                              <div className="flex items-center gap-2">
-                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                <span className="font-medium">{doc.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {new Date(doc.uploadedAt).toLocaleDateString('es-AR')}
-                                </span>
-                              </div>
-                              <div className="flex gap-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8"
-                                  onClick={() => handleViewDetails(doc)}
-                                  title="Ver documento"
-                                >
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8"
-                                  onClick={() => handleDownload(doc.url, doc.name)}
-                                  title="Descargar"
-                                >
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  onClick={() => handleDeleteDocument(customer._id, doc.url, doc.name, doc._id)}
-                                  title="Eliminar documento"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
+                    <TableRow key={customer._id}>
+                      <TableCell className="font-medium align-top pt-6">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {customer.name}
                         </div>
-                      ) : (
-                        <div className="text-muted-foreground text-sm py-2">
-                          No hay documentos cargados
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="align-top pt-6">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => {
-                          setSelectedCustomer(customer._id);
-                          setIsUploadDialogOpen(true);
-                        }}
-                      >
-                        <Upload className="mr-2 h-4 w-4" />
-                        Subir
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        {customer.documents && customer.documents.length > 0 ? (
+                          <div className="space-y-2">
+                            {customer.documents.map((doc) => (
+                              <div key={doc._id} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">{doc.name}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {new Date(doc.uploadedAt).toLocaleDateString('es-AR')}
+                                  </span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => handleViewDetails(doc)}
+                                    title="Ver documento"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => handleDownload(doc.url, doc.name)}
+                                    title="Descargar"
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                    onClick={() => handleDeleteDocument(customer._id, doc.url, doc.name, doc._id)}
+                                    title="Eliminar documento"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-muted-foreground text-sm py-2">
+                            No hay documentos cargados
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="align-top pt-6">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCustomer(customer._id);
+                            setIsUploadDialogOpen(true);
+                          }}
+                        >
+                          <Upload className="mr-2 h-4 w-4" />
+                          Subir
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
                 {isLoadingCustomers ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-12">
