@@ -333,7 +333,6 @@ export default function ClientDocumentsPage() {
     setIsUploading(true);
     setUploadProgress(0);
 
-    // Prepare newDocument object from individual state values
     const newDocument = {
       name: documentName,
       project: documentProject,
@@ -348,14 +347,12 @@ export default function ClientDocumentsPage() {
         const uploadData = new FormData();
         uploadData.append('file', file);
 
-        // Use customerId for customers, otherwise use user._id
         const userId = user?.role === 'customer' ? user.customerId : user?._id;
         if (!userId) {
           throw new Error('ID de usuario o cliente no disponible');
         }
         uploadData.append('userId', userId);
 
-        // Add workId to the form data if available
         if (newDocument.projectId) {
           uploadData.append('workId', newDocument.projectId);
         }
@@ -364,7 +361,6 @@ export default function ClientDocumentsPage() {
           throw new Error('No se encontró el token de autenticación');
         }
 
-        // Create axios config with proper types
         const config = {
           headers: {
             'Content-Type': 'multipart/form-data',
@@ -384,7 +380,7 @@ export default function ClientDocumentsPage() {
           const response = await axios.post<UploadResponse>(
             `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
             uploadData,
-            config as any // Type assertion to bypass the type checking
+            config as any
           );
 
           if (response.data?.document?.url) {
@@ -398,14 +394,12 @@ export default function ClientDocumentsPage() {
           throw new Error('No se pudo obtener la URL del archivo subido');
         } catch (error) {
           console.error(`Error uploading file ${file.name}:`, error);
-          throw error; // Re-throw to be caught by the outer catch
+          throw error;
         }
       });
 
-      // Wait for all uploads to complete
       const results = await Promise.allSettled(uploadPromises);
 
-      // Check if any uploads failed
       const failedUploads = results.filter(result => result.status === 'rejected');
 
       if (failedUploads.length > 0) {
@@ -413,7 +407,6 @@ export default function ClientDocumentsPage() {
         throw new Error(`No se pudieron subir ${failedUploads.length} de ${results.length} archivos`);
       }
 
-      // Process successful uploads
       const newDocs = results
         .filter((result): result is PromiseFulfilledResult<UploadedFile> =>
           result.status === 'fulfilled' && result.value !== undefined
@@ -434,15 +427,12 @@ export default function ClientDocumentsPage() {
           };
         });
 
-      // Update the documents list with the new documents
       setDocumentsList(prev => [...prev, ...newDocs]);
-      // Show success message
       toast({
         title: 'Éxito',
         description: 'Documento(s) subido(s) correctamente',
       });
 
-      // Reset the file input
       if (e.target) {
         e.target.value = '';
       }
@@ -497,7 +487,6 @@ export default function ClientDocumentsPage() {
       if (documentCategory) formData.append('category', documentCategory);
       if (documentDescription) formData.append('description', documentDescription);
 
-      // Create a custom config with proper types
       const config = {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -505,7 +494,6 @@ export default function ClientDocumentsPage() {
         }
       };
 
-      // Add upload progress handler
       const progressHandler = (progressEvent: ProgressEvent) => {
         if (progressEvent.lengthComputable) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -513,7 +501,6 @@ export default function ClientDocumentsPage() {
         }
       };
 
-      // Subir el archivo usando axios con manejo de progreso
       try {
         const response: any = await axios.post<{ url: string }>(
           `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
@@ -536,20 +523,14 @@ export default function ClientDocumentsPage() {
 
         // Verificar si la subida fue exitosa
         if (response.data?.document?.url) {
-          // Éxito en la subida
           toast({
             title: "¡Éxito!",
             description: "El archivo se ha subido correctamente.",
             variant: "default",
           });
 
-          // Actualizar la lista de documentos
-          if (customers && customers.length > 0) {
-            const docs = extractDocumentsFromCustomer(customers);
-            setDocumentsList(docs);
-          }
+          await fetchData();
 
-          // Cerrar el diálogo y reiniciar el estado
           setIsUploadDialogOpen(false);
           setDocumentFile(null);
           setUploadProgress(0);
@@ -583,7 +564,6 @@ export default function ClientDocumentsPage() {
     }
   }, [documentProjectId, documentFile, documentName, documentCategory, documentDescription, user, token]);
 
-  // Reset form when dialog is closed
   useEffect(() => {
     if (!isUploadDialogOpen) {
       setDocumentName('');
@@ -718,10 +698,12 @@ export default function ClientDocumentsPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)} disabled={isUploading}>
                 Cancelar
               </Button>
-              <Button onClick={handleUploadDocument}>Subir Documento</Button>
+              <Button onClick={handleUploadDocument} disabled={isUploading}>
+                {isUploading ? "Subiendo..." : "Subir Documento"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -842,7 +824,6 @@ export default function ClientDocumentsPage() {
                     </PaginationItem>
 
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      // Show first 2 pages, current page with neighbors, and last 2 pages
                       let pageNum;
                       if (totalPages <= 5) {
                         pageNum = i + 1;

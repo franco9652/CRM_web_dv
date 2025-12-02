@@ -9,14 +9,6 @@ import { getWorksByCustomerId } from "@/services/works"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Building, Download, Eye, FileText, Loader2, MoreHorizontal, Plus, Search, Upload, User, Trash2 } from "lucide-react"
@@ -43,7 +35,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import axios from 'axios';
 
-// Initialize with empty array as we'll fetch documents from the API
 const initialDocuments: Array<{
   id: number | string;
   name: string;
@@ -70,31 +61,24 @@ const availableCategories = [
 ]
 
 export default function DocumentsPage() {
-  // State for documents and filters
   const [documents, setDocuments] = useState(initialDocuments);
   const [searchTerm, setSearchTerm] = useState("");
 
-
-  // Upload related state
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Auth and user state
   const [token, setToken] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Customers state
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
 
-  // Selected customer and works state
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [customerWorks, setCustomerWorks] = useState<Array<{ _id: string, name: string }>>([]);
   const [isLoadingWorks, setIsLoadingWorks] = useState(false);
 
-  // Delete document state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<{ customerId: string, fileName: string, documentName: string, documentId: string } | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -132,13 +116,11 @@ export default function DocumentsPage() {
 
 
   useEffect(() => {
-    // Get token from localStorage
     const authToken = localStorage.getItem('token')
     if (authToken) {
       setToken(authToken)
     }
 
-    // Fetch customers
     const fetchCustomers = async () => {
       if (!authToken) return;
 
@@ -160,8 +142,6 @@ export default function DocumentsPage() {
 
     fetchCustomers();
   }, [])
-
-  // Fetch works when customer changes
   useEffect(() => {
     const fetchCustomerWorks = async () => {
       if (!selectedCustomer) {
@@ -221,7 +201,7 @@ export default function DocumentsPage() {
       setNewDocument({
         ...newDocument,
         file: e.target.files[0],
-        url: '' // Initialize with empty string, will be set after upload
+        url: ''
       })
     }
   }
@@ -309,7 +289,6 @@ export default function DocumentsPage() {
         throw new Error(errorData.message || 'Error al eliminar el documento');
       }
 
-      // Update customers state to remove the deleted document
       setCustomers(prevCustomers =>
         prevCustomers.map(customer => {
           if (customer._id === documentToDelete.customerId) {
@@ -420,6 +399,13 @@ export default function DocumentsPage() {
         description: 'Documentos subidos correctamente',
         variant: 'default',
       })
+
+      try {
+        const updatedCustomers = await getAllCustomers();
+        setCustomers(updatedCustomers);
+      } catch (error) {
+        console.error('Error refreshing customers after upload:', error);
+      }
 
       // Reset form
       setNewDocument({
