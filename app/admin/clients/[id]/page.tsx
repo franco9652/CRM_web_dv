@@ -21,12 +21,12 @@ export default function ClientDetailsPage() {
       return '-';
     }
     try {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("es-ES", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }).format(date)
+      const date = new Date(dateString)
+      return new Intl.DateTimeFormat("es-ES", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(date)
     } catch (error) {
       console.error(`Error al formatear fecha: ${dateString}`, error);
       return '-';
@@ -82,14 +82,25 @@ export default function ClientDetailsPage() {
     return null
   }
 
-  function downloadDocument(document: any): void {
-    const url = document.url;
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = document.originalName;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  async function downloadDocument(doc: any): Promise<void> {
+    try {
+      const response = await fetch(doc.url);
+      const blob = await response.blob();
+
+      const blobUrl = URL.createObjectURL(blob);
+
+      const link = window.document.createElement("a");
+      link.href = blobUrl;
+      link.download = doc.originalName || "documento";
+      window.document.body.appendChild(link);
+      link.click();
+
+      window.document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Error al descargar el documento:", error);
+      alert("Error al descargar el documento. Por favor, intente nuevamente.");
+    }
   }
 
   return (
@@ -101,9 +112,9 @@ export default function ClientDetailsPage() {
             Volver
           </Button>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
+        <Button
+          variant="outline"
+          size="sm"
           onClick={() => router.push(`/admin/clients/${params.id}/edit`)}
           className="ml-auto"
         >
@@ -117,13 +128,12 @@ export default function ClientDetailsPage() {
           <CardTitle>Información del Cliente</CardTitle>
           <span
             className={` w-24 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
-            ${
-              client?.active === true
+            ${client?.active === true
                 ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
                 : client?.active === false
                   ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
                   : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-            }`}
+              }`}
           >
             {client?.active === true ? "Activo" : "Inactivo"}
           </span>
@@ -212,22 +222,22 @@ export default function ClientDetailsPage() {
                   client?.documents?.length === 0 ? (
                     <p>No hay documentos disponibles para este cliente.</p>
                   ) : (
-                  client?.documents?.map((document: any) => (
-                    <div key={document._id} className="flex items-start gap-4 p-4 border rounded-md">
-                      <div className="bg-primary/10 p-2 rounded-full">
-                        <FileText className="h-4 w-4 text-primary" />
+                    client?.documents?.map((document: any) => (
+                      <div key={document._id} className="flex items-start gap-4 p-4 border rounded-md">
+                        <div className="bg-primary/10 p-2 rounded-full">
+                          <FileText className="h-4 w-4 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-medium">{document.fileName}</p>
+                          <p className="font-medium">{document.originalName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {document.mimeType} • Subido el {formatDate(document.uploadedAt)}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => downloadDocument(document)}>
+                          Descargar
+                        </Button>
                       </div>
-                      <div className="flex-1">
-                        <p className="font-medium">{document.fileName}</p>
-                        <p className="font-medium">{document.originalName}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {document.mimeType} • Subido el {formatDate(document.uploadedAt)}
-                        </p>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={() => downloadDocument(document)}>
-                        Descargar
-                      </Button>
-                    </div>
                     ))
                   )
                 }
