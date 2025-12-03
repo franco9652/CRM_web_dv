@@ -42,16 +42,16 @@ const availableCategories = [
 // Función para extraer documentos del cliente
 const extractDocumentsFromCustomer = (customers: Customer[]): any[] => {
   if (!customers || customers.length === 0) return [];
-  
+
   return customers.flatMap(customer => {
     if (!customer.documents || !Array.isArray(customer.documents)) return [];
-    
+
     return customer.documents.map((doc: any) => {
       // Extraer el nombre del archivo de la URL
       const fileName = doc.name || doc.url.split('/').pop() || 'Documento';
       // Extraer la extensión para el tipo
       const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'PDF';
-      
+
       return {
         id: doc._id,
         name: fileName,
@@ -72,7 +72,7 @@ export default function ClientDocumentsPage() {
   const { toast } = useToast()
   const [searchTerm, setSearchTerm] = useState("")
   const [token, setToken] = useState<string | null>(null)
-  
+
   useEffect(() => {
     // Get token from localStorage
     const authToken = localStorage.getItem('token')
@@ -87,8 +87,7 @@ export default function ClientDocumentsPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true)
   const [customersError, setCustomersError] = useState("")
-  const [projectFilter, setProjectFilter] = useState("Todos")
-  const [categoryFilter, setCategoryFilter] = useState("Todas")
+
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -97,7 +96,7 @@ export default function ClientDocumentsPage() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10) // Number of items per page
-  
+
   // Estados para el formulario de subida
   const [documentFile, setDocumentFile] = useState<File | null>(null)
   const [documentProject, setDocumentProject] = useState("")
@@ -105,7 +104,7 @@ export default function ClientDocumentsPage() {
   const [documentCategory, setDocumentCategory] = useState("")
   const [documentName, setDocumentName] = useState("")
   const [documentDescription, setDocumentDescription] = useState("")
-  
+
   // Actualizar documentos cuando cambian los clientes
   useEffect(() => {
     if (customers && customers.length > 0) {
@@ -116,69 +115,69 @@ export default function ClientDocumentsPage() {
     }
   }, [customers]);
 
-    const fetchWorks = async (customerId: string) => {
-      if (!customerId) {
-        setWorks([]);
-        return;
-      }
-      
-      setLoadingWorks(true);
-      setWorksError("");
-      try {
-        const response = await getWorksByCustomerId(customerId);
-        const data = response.works || [];
-        setWorks(data);
-      } catch (err: any) {
-        if(err?.status === 400){
-          setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
-          toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
-        } else if (err?.status === 404){
-          setWorksError("No se encontraron proyectos")
-          // No mostrar toast de error para el caso específico de "No se encontraron presupuestos para este usuario"
-          // ya que es normal que clientes nuevos no tengan presupuestos aún
-          if (err?.message && !err.message.includes("No works found for this customer")) {
-            toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
-          }
-        } else {
-          setWorksError("Error al cargar los proyectos")
+  const fetchWorks = async (customerId: string) => {
+    if (!customerId) {
+      setWorks([]);
+      return;
+    }
+
+    setLoadingWorks(true);
+    setWorksError("");
+    try {
+      const response = await getWorksByCustomerId(customerId);
+      const data = response.works || [];
+      setWorks(data);
+    } catch (err: any) {
+      if (err?.status === 400) {
+        setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
+        toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
+      } else if (err?.status === 404) {
+        setWorksError("No se encontraron proyectos")
+        // No mostrar toast de error para el caso específico de "No se encontraron presupuestos para este usuario"
+        // ya que es normal que clientes nuevos no tengan presupuestos aún
+        if (err?.message && !err.message.includes("No works found for this customer")) {
           toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
         }
-      } finally {
-        setLoadingWorks(false)
+      } else {
+        setWorksError("Error al cargar los proyectos")
+        toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
       }
+    } finally {
+      setLoadingWorks(false)
     }
-  
-    async function fetchData() {
-      if (!user?.id) return
-      try {
-        const response = await getCustomersByUserId(user.id);
-        // Ensure we're setting the customers array correctly
-        if (Array.isArray(response)) {
-          setCustomers(response);
-        } else if (response && Array.isArray(response.customer)) {
-          setCustomers(response.customer);
-        } else {
-          setCustomers([]);
-        }
-      } catch (err: any) {
-        setCustomersError(err?.message ?? "Error al obtener clientes");
-      } finally {
-        setLoadingCustomers(false);
+  }
+
+  async function fetchData() {
+    if (!user?.id) return
+    try {
+      const response = await getCustomersByUserId(user.id);
+      // Ensure we're setting the customers array correctly
+      if (Array.isArray(response)) {
+        setCustomers(response);
+      } else if (response && Array.isArray(response.customer)) {
+        setCustomers(response.customer);
+      } else {
+        setCustomers([]);
       }
+    } catch (err: any) {
+      setCustomersError(err?.message ?? "Error al obtener clientes");
+    } finally {
+      setLoadingCustomers(false);
     }
-  
-    useEffect(() => {
-      // Only fetch customers initially, works will be fetched when a customer is selected
-      fetchData()
-    }, [user?.id, user?.role])
-    
-    // When customers are loaded, select the first one by default if there's only one
-    useEffect(() => {
-      if (customers.length === 1 && !selectedCustomerId) {
-        setSelectedCustomerId(customers[0]._id);
-        fetchWorks(customers[0]._id);
-      }
-    }, [customers]);
+  }
+
+  useEffect(() => {
+    // Only fetch customers initially, works will be fetched when a customer is selected
+    fetchData()
+  }, [user?.id, user?.role])
+
+  // When customers are loaded, select the first one by default if there's only one
+  useEffect(() => {
+    if (customers.length === 1 && !selectedCustomerId) {
+      setSelectedCustomerId(customers[0]._id);
+      fetchWorks(customers[0]._id);
+    }
+  }, [customers]);
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
@@ -194,21 +193,21 @@ export default function ClientDocumentsPage() {
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setDocumentName(e.target.value);
   }, []);
-  
+
   const handleProjectChange = useCallback((value: string) => {
     const selectedWork = works.find(work => work._id === value);
     setDocumentProject(selectedWork?.name || '');
     setDocumentProjectId(value);
   }, [works]);
-  
+
   const handleCategoryChange = useCallback((value: string) => {
     setDocumentCategory(value);
   }, []);
-  
+
   const handleDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setDocumentDescription(e.target.value);
   }, []);
-  
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
@@ -224,10 +223,8 @@ export default function ClientDocumentsPage() {
   const filteredDocuments = documentsList.filter((doc) => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       doc.project.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesProject = projectFilter === "Todos" || doc.project === projectFilter
-    const matchesCategory = categoryFilter === "Todas" || doc.category === categoryFilter
 
-    return matchesSearch && matchesProject && matchesCategory
+    return matchesSearch
   })
 
   // Get current documents for pagination
@@ -241,10 +238,10 @@ export default function ClientDocumentsPage() {
   const nextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages))
   const prevPage = () => setCurrentPage(prev => Math.max(prev - 1, 1))
 
-  // Reset to first page when filters change
+  // Reset to first page when search changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchTerm, projectFilter, categoryFilter])
+  }, [searchTerm])
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -279,29 +276,24 @@ export default function ClientDocumentsPage() {
     }
   }
 
-  // Extraer proyectos únicos para el filtro
-  const projects = ["Todos", ...Array.from(new Set(documentsList.map((doc) => doc?.project).filter(Boolean)))]
-
-  // Extraer categorías únicas para el filtro
-  const categories = ["Todas", ...Array.from(new Set(documentsList.map((doc) => doc?.category).filter(Boolean)))]
 
 
   const handleDownload = async (url: string, fileName: string) => {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error('Network response was not ok');
-      
+
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      
+
       link.href = downloadUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
-      
+
       toast({
         title: "Descarga iniciada",
         description: `El archivo ${fileName} se está descargando.`,
@@ -340,8 +332,7 @@ export default function ClientDocumentsPage() {
 
     setIsUploading(true);
     setUploadProgress(0);
-    
-    // Prepare newDocument object from individual state values
+
     const newDocument = {
       name: documentName,
       project: documentProject,
@@ -355,15 +346,13 @@ export default function ClientDocumentsPage() {
       const uploadPromises: Promise<UploadedFile>[] = Array.from(files).map(async (file) => {
         const uploadData = new FormData();
         uploadData.append('file', file);
-        
-        // Use customerId for customers, otherwise use user._id
+
         const userId = user?.role === 'customer' ? user.customerId : user?._id;
         if (!userId) {
           throw new Error('ID de usuario o cliente no disponible');
         }
         uploadData.append('userId', userId);
-        
-        // Add workId to the form data if available
+
         if (newDocument.projectId) {
           uploadData.append('workId', newDocument.projectId);
         }
@@ -372,7 +361,6 @@ export default function ClientDocumentsPage() {
           throw new Error('No se encontró el token de autenticación');
         }
 
-        // Create axios config with proper types
         const config = {
           headers: {
             'Content-Type': 'multipart/form-data',
@@ -392,7 +380,7 @@ export default function ClientDocumentsPage() {
           const response = await axios.post<UploadResponse>(
             `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
             uploadData,
-            config as any // Type assertion to bypass the type checking
+            config as any
           );
 
           if (response.data?.document?.url) {
@@ -406,24 +394,21 @@ export default function ClientDocumentsPage() {
           throw new Error('No se pudo obtener la URL del archivo subido');
         } catch (error) {
           console.error(`Error uploading file ${file.name}:`, error);
-          throw error; // Re-throw to be caught by the outer catch
+          throw error;
         }
       });
 
-      // Wait for all uploads to complete
       const results = await Promise.allSettled(uploadPromises);
-      
-      // Check if any uploads failed
+
       const failedUploads = results.filter(result => result.status === 'rejected');
-      
+
       if (failedUploads.length > 0) {
         console.error('Algunos archivos no se pudieron subir:', failedUploads);
         throw new Error(`No se pudieron subir ${failedUploads.length} de ${results.length} archivos`);
       }
-      
-      // Process successful uploads
+
       const newDocs = results
-        .filter((result): result is PromiseFulfilledResult<UploadedFile> => 
+        .filter((result): result is PromiseFulfilledResult<UploadedFile> =>
           result.status === 'fulfilled' && result.value !== undefined
         )
         .map((result, index) => {
@@ -441,16 +426,13 @@ export default function ClientDocumentsPage() {
             requiresAction: false
           };
         });
-      
-      // Update the documents list with the new documents
+
       setDocumentsList(prev => [...prev, ...newDocs]);
-      // Show success message
       toast({
         title: 'Éxito',
         description: 'Documento(s) subido(s) correctamente',
       });
-      
-      // Reset the file input
+
       if (e.target) {
         e.target.value = '';
       }
@@ -476,7 +458,7 @@ export default function ClientDocumentsPage() {
       });
       return;
     }
-    
+
     if (!documentFile) {
       toast({
         title: 'Error',
@@ -489,23 +471,22 @@ export default function ClientDocumentsPage() {
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      
+
       const formData = new FormData();
       formData.append('file', documentFile);
-      
+
       const userId = user?.role === 'customer' ? user.customerId : user?._id;
       if (!userId) {
         throw new Error('ID de usuario o cliente no disponible');
       }
-      
+
       formData.append('userId', userId);
       formData.append('workId', documentProjectId);
-      
+
       if (documentName) formData.append('name', documentName);
       if (documentCategory) formData.append('category', documentCategory);
       if (documentDescription) formData.append('description', documentDescription);
-      
-      // Create a custom config with proper types
+
       const config = {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -513,7 +494,6 @@ export default function ClientDocumentsPage() {
         }
       };
 
-      // Add upload progress handler
       const progressHandler = (progressEvent: ProgressEvent) => {
         if (progressEvent.lengthComputable) {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -521,7 +501,6 @@ export default function ClientDocumentsPage() {
         }
       };
 
-      // Subir el archivo usando axios con manejo de progreso
       try {
         const response: any = await axios.post<{ url: string }>(
           `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
@@ -541,23 +520,17 @@ export default function ClientDocumentsPage() {
             }
           } as any // Usamos 'as any' temporalmente para evitar problemas de tipos
         );
-        
+
         // Verificar si la subida fue exitosa
         if (response.data?.document?.url) {
-          // Éxito en la subida
           toast({
             title: "¡Éxito!",
             description: "El archivo se ha subido correctamente.",
             variant: "default",
           });
-          
-          // Actualizar la lista de documentos
-          if (customers && customers.length > 0) {
-            const docs = extractDocumentsFromCustomer(customers);
-            setDocumentsList(docs);
-          }
-          
-          // Cerrar el diálogo y reiniciar el estado
+
+          await fetchData();
+
           setIsUploadDialogOpen(false);
           setDocumentFile(null);
           setUploadProgress(0);
@@ -591,7 +564,6 @@ export default function ClientDocumentsPage() {
     }
   }, [documentProjectId, documentFile, documentName, documentCategory, documentDescription, user, token]);
 
-  // Reset form when dialog is closed
   useEffect(() => {
     if (!isUploadDialogOpen) {
       setDocumentName('');
@@ -708,9 +680,9 @@ export default function ClientDocumentsPage() {
               <div className="grid gap-2">
                 <Label htmlFor="doc-file">Archivo</Label>
                 <div className="flex items-center gap-2">
-                  <Input 
-                    id="doc-file" 
-                    type="file" 
+                  <Input
+                    id="doc-file"
+                    type="file"
                     onChange={handleFileChange}
                     className="cursor-pointer"
                   />
@@ -726,10 +698,12 @@ export default function ClientDocumentsPage() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>
+              <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)} disabled={isUploading}>
                 Cancelar
               </Button>
-              <Button onClick={handleUploadDocument}>Subir Documento</Button>
+              <Button onClick={handleUploadDocument} disabled={isUploading}>
+                {isUploading ? "Subiendo..." : "Subir Documento"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -746,36 +720,12 @@ export default function ClientDocumentsPage() {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Buscar documentos..."
+                placeholder="Buscar por nombre de archivo o nombre del trabajo..."
                 className="pl-8"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Select value={projectFilter} onValueChange={setProjectFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filtrar por proyecto" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project} value={project}>
-                    {project}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-full md:w-[180px]">
-                <SelectValue placeholder="Filtrar por categoría" />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((category) => (
-                  <SelectItem key={category} value={category}>
-                    {category}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
           <div className="rounded-md border">
             <Table>
@@ -821,18 +771,18 @@ export default function ClientDocumentsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <a 
-                          href={document.url} 
-                          target="_blank" 
+                        <a
+                          href={document.url}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 w-8 p-0"
                         >
                           <Eye className="h-4 w-4" />
                           <span className="sr-only">Ver</span>
                         </a>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           className="h-8 w-8 p-0"
                           onClick={() => handleDownload(document.url, document.name)}
                         >
@@ -853,7 +803,7 @@ export default function ClientDocumentsPage() {
                 )}
               </TableBody>
             </Table>
-            
+
             {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="flex items-center justify-end space-x-2 py-4">
@@ -863,8 +813,8 @@ export default function ClientDocumentsPage() {
                 <Pagination className="justify-end">
                   <PaginationContent>
                     <PaginationItem>
-                      <PaginationPrevious 
-                        href="#" 
+                      <PaginationPrevious
+                        href="#"
                         onClick={(e) => {
                           e.preventDefault();
                           prevPage();
@@ -872,9 +822,8 @@ export default function ClientDocumentsPage() {
                         className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
                       />
                     </PaginationItem>
-                    
+
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      // Show first 2 pages, current page with neighbors, and last 2 pages
                       let pageNum;
                       if (totalPages <= 5) {
                         pageNum = i + 1;
@@ -885,10 +834,10 @@ export default function ClientDocumentsPage() {
                       } else {
                         pageNum = currentPage - 2 + i;
                       }
-                      
+
                       return (
                         <PaginationItem key={pageNum}>
-                          <PaginationLink 
+                          <PaginationLink
                             href="#"
                             onClick={(e) => {
                               e.preventDefault();
@@ -901,10 +850,10 @@ export default function ClientDocumentsPage() {
                         </PaginationItem>
                       );
                     })}
-                    
+
                     <PaginationItem>
-                      <PaginationNext 
-                        href="#" 
+                      <PaginationNext
+                        href="#"
                         onClick={(e) => {
                           e.preventDefault();
                           nextPage();
