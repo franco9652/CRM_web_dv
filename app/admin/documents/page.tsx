@@ -338,6 +338,17 @@ export default function DocumentsPage() {
         uploadData.append('file', file)
         uploadData.append('userId', userId)
 
+        // Agregar proyecto, categoría y descripción al FormData
+        if (newDocument.project) {
+          uploadData.append('project', newDocument.project)
+        }
+        if (newDocument.category) {
+          uploadData.append('category', newDocument.category)
+        }
+        if (newDocument.description) {
+          uploadData.append('description', newDocument.description)
+        }
+
         if (!token) {
           throw new Error('No se encontró el token de autenticación')
         }
