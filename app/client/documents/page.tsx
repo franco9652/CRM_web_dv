@@ -310,13 +310,12 @@ export default function ClientDocumentsPage() {
 
   interface UploadResponse {
     message: string;
-    document: {
-      fileName: string;
-      originalName: string;
-      mimeType: string;
-      size: number;
-      url: string;
-    };
+    name: string;
+    url: string;
+    fileName?: string;
+    originalName?: string;
+    mimeType?: string;
+    size?: number;
   }
 
   interface UploadedFile {
@@ -347,18 +346,28 @@ export default function ClientDocumentsPage() {
         const uploadData = new FormData();
         uploadData.append('file', file);
 
-        const userId = user?.role === 'customer' ? user.customerId : user?._id;
-        if (!userId) {
-          throw new Error('ID de usuario o cliente no disponible');
-        }
-        uploadData.append('userId', userId);
-
-        if (newDocument.workId) {
-          uploadData.append('workId', newDocument.workId);
+        if (!selectedCustomerId) {
+          throw new Error('Por favor seleccione un cliente');
         }
 
         if (!token) {
           throw new Error('No se encontró el token de autenticación');
+        }
+
+        // Enviar customerId (requerido por el backend)
+        uploadData.append('customerId', selectedCustomerId);
+
+        // Agregar workId si está disponible
+        if (newDocument.workId) {
+          uploadData.append('workId', newDocument.workId);
+        }
+
+        // Agregar categoría y descripción si están disponibles
+        if (newDocument.category) {
+          uploadData.append('category', newDocument.category);
+        }
+        if (newDocument.description) {
+          uploadData.append('description', newDocument.description);
         }
 
         const config = {
@@ -378,15 +387,15 @@ export default function ClientDocumentsPage() {
 
         try {
           const response = await axios.post<UploadResponse>(
-            `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
+            `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
             uploadData,
             config as any
           );
 
-          if (response.data?.document?.url) {
+          if (response.data?.url) {
             return {
-              name: file.name,
-              url: response.data.document.url,
+              name: response.data.name || file.name,
+              url: response.data.url,
               size: file.size,
               type: file.type
             };
@@ -475,14 +484,19 @@ export default function ClientDocumentsPage() {
       const formData = new FormData();
       formData.append('file', documentFile);
 
-      const userId = user?.role === 'customer' ? user.customerId : user?._id;
-      if (!userId) {
-        throw new Error('ID de usuario o cliente no disponible');
+      if (!selectedCustomerId) {
+        throw new Error('Por favor seleccione un cliente');
       }
 
-      formData.append('userId', userId);
-      formData.append('workId', documentWorkId);
+      // Enviar customerId (requerido por el backend)
+      formData.append('customerId', selectedCustomerId);
 
+      // Agregar workId si está disponible
+      if (documentWorkId) {
+        formData.append('workId', documentWorkId);
+      }
+
+      // Agregar otros campos si están disponibles
       if (documentName) formData.append('name', documentName);
       if (documentCategory) formData.append('category', documentCategory);
       if (documentDescription) formData.append('description', documentDescription);
@@ -503,7 +517,7 @@ export default function ClientDocumentsPage() {
 
       try {
         const response: any = await axios.post<{ url: string }>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
           formData,
           {
             headers: {
@@ -518,11 +532,11 @@ export default function ClientDocumentsPage() {
                 setUploadProgress(percentCompleted);
               }
             }
-          } as any // Usamos 'as any' temporalmente para evitar problemas de tipos
+          } as any
         );
 
         // Verificar si la subida fue exitosa
-        if (response.data?.document?.url) {
+        if (response.data?.url) {
           toast({
             title: "¡Éxito!",
             description: "El archivo se ha subido correctamente.",

@@ -364,7 +364,7 @@ export default function DocumentsPage() {
         }
 
         const response: any = await axios.post<UploadResponse>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/documents/upload`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
           uploadData,
           {
             headers: {

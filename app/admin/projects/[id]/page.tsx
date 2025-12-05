@@ -83,13 +83,12 @@ export default function ProjectDetailsPage() {
 
   interface UploadResponse {
     message: string
-    document: {
-      fileName: string
-      originalName: string
-      mimeType: string
-      size: number
-      url: string
-    }
+    name: string
+    url: string
+    fileName?: string
+    originalName?: string
+    mimeType?: string
+    size?: number
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -115,23 +114,33 @@ export default function ProjectDetailsPage() {
       const uploadPromises = Array.from(files).map(async (file) => {
         const uploadData = new FormData()
         uploadData.append('file', file)
-        uploadData.append('userId', userId)
 
-        // Agregar workId al FormData si está disponible
-        if (newDocument.workId) {
-          uploadData.append('workId', newDocument.workId)
+        if (!selectedCustomer) {
+          throw new Error('Por favor seleccione un cliente');
         }
 
         if (!token) {
           throw new Error('No se encontró el token de autenticación')
         }
 
-        if (!selectedCustomer) {
-          throw new Error('Por favor seleccione un cliente');
+        // Enviar customerId (requerido por el backend)
+        uploadData.append('customerId', selectedCustomer)
+
+        // Agregar workId si está disponible
+        if (newDocument.workId) {
+          uploadData.append('workId', newDocument.workId)
+        }
+
+        // Agregar categoría y descripción si están disponibles
+        if (newDocument.category) {
+          uploadData.append('category', newDocument.category)
+        }
+        if (newDocument.description) {
+          uploadData.append('description', newDocument.description)
         }
 
         const response: any = await axios.post<UploadResponse>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${selectedCustomer}/upload`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
           uploadData,
           {
             headers: {
@@ -149,10 +158,10 @@ export default function ProjectDetailsPage() {
           } as any
         )
 
-        if (response.data?.document?.url) {
+        if (response.data?.url) {
           return {
-            name: file.name,
-            url: response.data.document.url,
+            name: response.data.name || file.name,
+            url: response.data.url,
             size: file.size,
             type: file.type
           }

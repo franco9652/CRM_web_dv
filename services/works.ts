@@ -146,7 +146,7 @@ export async function getWorksByCustomerId(userId: string): Promise<WorksByCusto
 
 export async function getWorkById(workId: string): Promise<Work | null> {
   if (!workId) throw new Error("WorkId inválido");
-  const res = await axios.get(`http://localhost:8080/workgetbyid/${workId}`);
+  const res = await axios.get(`${API_URL}/workgetbyid/${workId}`);
   return res.data as Work;
 }
 
