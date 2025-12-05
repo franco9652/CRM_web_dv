@@ -338,15 +338,24 @@ export default function DocumentsPage() {
       const uploadPromises = Array.from(files).map(async (file) => {
         const uploadData = new FormData()
         uploadData.append('file', file)
-        uploadData.append('userId', userId)
 
-        // Agregar proyecto, categoría y descripción al FormData
-        if (newDocument.project) {
-          uploadData.append('project', newDocument.project)
+        if (!selectedCustomer) {
+          throw new Error('Por favor seleccione un cliente');
         }
+
+        if (!token) {
+          throw new Error('No se encontró el token de autenticación')
+        }
+
+        // Enviar customerId (requerido por el backend)
+        uploadData.append('customerId', selectedCustomer)
+
+        // Agregar workId si está seleccionado
         if (newDocument.workId) {
           uploadData.append('workId', newDocument.workId)
         }
+
+        // Agregar categoría y descripción si están disponibles
         if (newDocument.category) {
           uploadData.append('category', newDocument.category)
         }
@@ -354,16 +363,8 @@ export default function DocumentsPage() {
           uploadData.append('description', newDocument.description)
         }
 
-        if (!token) {
-          throw new Error('No se encontró el token de autenticación')
-        }
-
-        if (!selectedCustomer) {
-          throw new Error('Por favor seleccione un cliente');
-        }
-
         const response: any = await axios.post<UploadResponse>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${selectedCustomer}/upload`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'}/api/documents/upload`,
           uploadData,
           {
             headers: {
@@ -381,10 +382,10 @@ export default function DocumentsPage() {
           } as any
         )
 
-        if (response.data?.document?.url) {
+        if (response.data?.url) {
           return {
-            name: file.name,
-            url: response.data.document.url,
+            name: response.dataname || file.name,
+            url: response.data.url,
             size: file.size,
             type: file.type
           }
