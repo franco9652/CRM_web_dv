@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronLeft, FileText, Users, Loader2, Upload, Building, User } from "lucide-react"
+import { ChevronLeft, FileText, Users, Loader2, Upload, Building, User, Download } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -221,45 +221,23 @@ export default function ProjectDetailsPage() {
     }
   }
 
-  // Función para combinar documentos del proyecto y del cliente
-  const combineDocuments = (projectData: Work | null, customersData: Customer[]) => {
+  // Función para obtener solo los documentos del proyecto
+  const getProjectDocuments = (projectData: Work | null) => {
     if (!projectData) return [];
 
-    const combinedDocs: any[] = [];
+    const projectDocs: any[] = [];
 
-    // Agregar documentos del proyecto
+    // Agregar solo documentos del proyecto
     if (projectData.documents && Array.isArray(projectData.documents)) {
       projectData.documents.forEach((doc: any) => {
-        combinedDocs.push({
+        projectDocs.push({
           ...doc,
-          source: 'project',
           displayName: doc.fileName || doc.originalName || doc.name
         });
       });
     }
 
-    // Buscar el cliente correspondiente al proyecto
-    const projectCustomer = customersData.find(customer =>
-      customer._id === projectData.customerId ||
-      customer.name === projectData.customerName
-    );
-
-    // Agregar documentos del cliente si existe
-    if (projectCustomer && projectCustomer.documents && Array.isArray(projectCustomer.documents)) {
-      projectCustomer.documents.forEach((doc: any) => {
-        combinedDocs.push({
-          ...doc,
-          source: 'customer',
-          displayName: doc.name,
-          fileName: doc.name,
-          originalName: doc.name,
-          mimeType: doc.name.split('.').pop()?.toUpperCase() || 'FILE',
-          uploadedAt: doc.uploadedAt
-        });
-      });
-    }
-
-    return combinedDocs;
+    return projectDocs;
   };
 
   const getWorkData = async () => {
@@ -279,13 +257,13 @@ export default function ProjectDetailsPage() {
     getWorkData()
   }, [params.id])
 
-  // Actualizar documentos combinados cuando cambien el proyecto o los clientes
+  // Actualizar documentos cuando cambie el proyecto
   useEffect(() => {
-    if (project && customers.length > 0) {
-      const combinedDocs = combineDocuments(project, customers);
-      setAllDocuments(combinedDocs);
+    if (project) {
+      const projectDocs = getProjectDocuments(project);
+      setAllDocuments(projectDocs);
     }
-  }, [project, customers])
+  }, [project])
 
   useEffect(() => {
     // Get token from localStorage
@@ -716,36 +694,70 @@ export default function ProjectDetailsPage() {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
-              <div className="space-y-4">
+              <div className="space-y-4 mt-6">
                 {
                   allDocuments.length === 0 ? (
-                    <p>No hay documentos disponibles para este proyecto.</p>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                      <p>No hay documentos disponibles para este proyecto.</p>
+                    </div>
                   ) : (
-                    allDocuments.map((document: any, index: number) => (
-                      <div key={document._id || `doc-${index}`} className="flex items-start gap-4 p-4 border rounded-md">
-                        <div className="bg-primary/10 p-2 rounded-full">
-                          <FileText className="h-4 w-4 text-primary" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{document.displayName || document.fileName || document.originalName || document.name}</p>
-                            {/* <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            document.source === 'project' 
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                              : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                          }`}>
-                            {document.source === 'project' ? 'Proyecto' : 'Cliente'}
-                          </span> */}
+                    allDocuments.map((document: any, index: number) => {
+                      // Formatear el tamaño del archivo
+                      const formatFileSize = (bytes: number) => {
+                        if (!bytes) return 'Tamaño desconocido';
+                        if (bytes < 1024) return `${bytes} B`;
+                        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+                        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+                      };
+
+                      return (
+                        <div key={document._id || `doc-${index}`} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                          <div className="bg-primary/10 p-3 rounded-lg">
+                            <FileText className="h-5 w-5 text-primary" />
                           </div>
-                          <p className="text-sm text-muted-foreground">
-                            {document.mimeType || 'FILE'} • Subido el {formatDate(document.uploadedAt)}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-base truncate">
+                                  {document.originalName || document.displayName || document.fileName || document.name}
+                                </p>
+                              </div>
+                              {document.category && (
+                                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 whitespace-nowrap">
+                                  {document.category}
+                                </span>
+                              )}
+                            </div>
+
+                            {document.description && (
+                              <p className="text-sm text-foreground/80 mb-2 line-clamp-2">
+                                {document.description}
+                              </p>
+                            )}
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <span className="font-medium">{document.mimeType || 'FILE'}</span>
+                              </span>
+                              <span>•</span>
+                              <span>{formatFileSize(document.size)}</span>
+                              <span>•</span>
+                              <span>Subido el {formatDate(document.uploadedAt)}</span>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownload(document.url, document.originalName || document.name)}
+                            className="shrink-0"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Descargar
+                          </Button>
                         </div>
-                        <Button size="sm" variant="outline" onClick={() => handleDownload(document.url, document.name)}>
-                          Descargar
-                        </Button>
-                      </div>
-                    ))
+                      );
+                    })
                   )
                 }
               </div>
