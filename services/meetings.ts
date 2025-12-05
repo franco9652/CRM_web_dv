@@ -100,7 +100,7 @@ export async function createMeeting(meetingData: CreateMeetingData): Promise<Mee
     if (!token) {
       throw new Error('No authentication token found');
     }
-    
+
     const response = await axios.post<Meeting>(
       `${API_URL}/meetingsCreate`,
       meetingData,
@@ -123,7 +123,7 @@ export async function updateMeeting(id: string, meetingData: Partial<CreateMeeti
     if (!token) {
       throw new Error('No authentication token found');
     }
-    
+
     const response = await axios.put<Meeting>(
       `${API_URL}/meetingsUpdate/${id}`,
       meetingData,
@@ -146,7 +146,7 @@ export async function deleteMeeting(id: string): Promise<void> {
     if (!token) {
       throw new Error('No authentication token found');
     }
-    
+
     await axios.delete(`${API_URL}/meetingsDelete/${id}`, {
       headers: {
         'Authorization': `Bearer ${token}`

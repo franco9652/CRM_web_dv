@@ -92,26 +92,26 @@ export async function getWorks(page?: number): Promise<WorksResponse> {
 export async function getAllWorks(): Promise<Work[]> {
   // Hacer una llamada con página 1 y obtener el total de páginas
   const firstResponse = await getWorks(1);
-  
+
   // Si solo hay una página, devolver directamente
   if (firstResponse.totalPages === 1) {
     return firstResponse.works;
   }
-  
+
   // Si hay múltiples páginas, hacer llamadas paralelas para mejor rendimiento
   const pagePromises: Promise<WorksResponse>[] = [];
-  
+
   for (let page = 1; page <= firstResponse.totalPages; page++) {
     pagePromises.push(getWorks(page));
   }
-  
+
   const allResponses = await Promise.all(pagePromises);
-  
+
   // Combinar todos los works de todas las páginas
   const allWorks = allResponses.reduce((acc, response) => {
     return [...acc, ...response.works];
   }, [] as Work[]);
-  
+
   return allWorks;
 }
 
@@ -147,7 +147,7 @@ export async function getWorksByCustomerId(userId: string): Promise<WorksByCusto
 export async function getWorkById(workId: string): Promise<Work | null> {
   if (!workId) throw new Error("WorkId inválido");
   const res = await axios.get(`${API_URL}/workgetbyid/${workId}`);
-  return res.data as Work;  
+  return res.data as Work;
 }
 
 export async function updateWork(workId: string, workData: UpdateWorkInput): Promise<Work> {

@@ -45,26 +45,26 @@ export async function getAllEmployees(): Promise<Employee[]> {
   try {
     // Obtener primera página para conocer el total de páginas
     const firstResponse = await getEmployees(1);
-    
+
     if (firstResponse.totalPages <= 1) {
       return firstResponse.employees;
     }
-    
+
     // Crear promesas para todas las páginas restantes
     const pagePromises: Promise<EmployeesResponse>[] = [Promise.resolve(firstResponse)];
-    
+
     for (let page = 2; page <= firstResponse.totalPages; page++) {
       pagePromises.push(getEmployees(page));
     }
-    
+
     // Ejecutar todas las promesas en paralelo
     const allResponses = await Promise.all(pagePromises);
-    
+
     // Combinar todos los empleados
     const allEmployees = allResponses.reduce((acc, response) => {
       return [...acc, ...(response.employees || [])];
     }, [] as Employee[]);
-    
+
     return allEmployees;
   } catch (error) {
     console.error('Error al obtener todos los empleados:', error);

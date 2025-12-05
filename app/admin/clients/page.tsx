@@ -24,8 +24,8 @@ import {
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Building, Loader2, MoreHorizontal, Search, UserPlus } from "lucide-react"
-import { getAllCustomers, getCustomersByUserId, createCustomer, Customer } from "@/services/customers"
+import { Building, Loader2, MoreHorizontal, Search, UserPlus, Trash2 } from "lucide-react"
+import { getAllCustomers, getCustomersByUserId, createCustomer, updateCustomer, deleteCustomer, Customer } from "@/services/customers"
 import { useAuth } from "@/components/auth-provider"
 import { useToast } from "@/hooks/use-toast"
 
@@ -56,12 +56,18 @@ export default function ClientsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [passwordError, setPasswordError] = useState("")
+  const [dniError, setDniError] = useState("")
+  const [cuitError, setCuitError] = useState("")
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(true)
   const [customersCount, setCustomersCount] = useState(0)
   const [customersError, setCustomersError] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [clientToDelete, setClientToDelete] = useState<Customer | null>(null)
+  const [updatingClientId, setUpdatingClientId] = useState<string | null>(null)
 
   const fetchCustomers = async () => {
     if (!user?.role) {
@@ -86,9 +92,9 @@ export default function ClientsPage() {
       }
       setCustomers(data)
     } catch (err: any) {
-      if(err?.status === 400){
+      if (err?.status === 400) {
         setCustomersError(`"Error al cargar los clientes. ID cliente erroneo"`)
-      } else if (err?.status === 404){
+      } else if (err?.status === 404) {
         setCustomersError("No se encontraron clientes")
         setLoadingCustomers(false)
       } else {
@@ -101,10 +107,10 @@ export default function ClientsPage() {
     }
   }
 
-  const filteredClients = useMemo(() => 
+  const filteredClients = useMemo(() =>
     customers.filter(
       (client) =>
-        (client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (client.contactNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         (client.email || "").toLowerCase().includes(searchTerm.toLowerCase()))
     ),
@@ -138,37 +144,93 @@ export default function ClientsPage() {
     return ""
   }
 
+  const validateDNI = (dni: string) => {
+    if (!dni) {
+      return "El DNI no puede estar vacío."
+    }
+    // Remove periods from DNI
+    const cleanDNI = dni.replace(/\./g, '')
+    // Check if it contains only digits
+    if (!/^\d+$/.test(cleanDNI)) {
+      return "El DNI solo debe contener números (se permiten puntos)."
+    }
+    // Check if it has 7 or 8 digits
+    if (cleanDNI.length !== 7 && cleanDNI.length !== 8) {
+      return "El DNI debe tener 7 u 8 dígitos."
+    }
+    return ""
+  }
+
+  const validateCUIT = (cuit: string) => {
+    if (!cuit) {
+      return "El CUIT no puede estar vacío."
+    }
+    // Remove hyphens from CUIT
+    const cleanCUIT = cuit.replace(/-/g, '')
+    // Check if it contains only digits
+    if (!/^\d+$/.test(cleanCUIT)) {
+      return "El CUIT solo debe contener números (se permiten guiones)."
+    }
+    // Check if it has exactly 11 digits
+    if (cleanCUIT.length !== 11) {
+      return "El CUIT debe tener exactamente 11 dígitos."
+    }
+    // Check if the prefix is valid
+    const prefix = cleanCUIT.substring(0, 2)
+    const validPrefixes = ['20', '23', '24', '27', '30', '33', '34']
+    if (!validPrefixes.includes(prefix)) {
+      return "Prefijo de CUIT inválido. Prefijos válidos: 20, 23, 24, 27, 30, 33, 34"
+    }
+    return ""
+  }
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    
+
     // Validate password
     const passwordValidation = validatePassword(newCustomer.password)
     if (passwordValidation) {
       setPasswordError(passwordValidation)
       return
     }
-    
+
+    // Validate DNI
+    const dniValidation = validateDNI(newCustomer.dni)
+    if (dniValidation) {
+      setDniError(dniValidation)
+      return
+    }
+
+    // Validate CUIT
+    const cuitValidation = validateCUIT(newCustomer.cuit)
+    if (cuitValidation) {
+      setCuitError(cuitValidation)
+      return
+    }
+
     setIsSubmitting(true)
     setPasswordError("")
+    setDniError("")
+    setCuitError("")
 
-    
+
     try {
       // Create a new customer object with all fields from the form
       const customerData = {
         ...newCustomer,
         phone: newCustomer.contactNumber,  // Map contactNumber to phone for the API
       }
-      
+
       // Call the createCustomer function
       const createdCustomer = await createCustomer(customerData)
-      
+
       // Show success message
       toast({
         title: "Cliente creado",
         description: `El cliente ${newCustomer?.name} ha sido creado exitosamente.`,
         variant: "default",
       })
-      
+
       // Close the dialog and reset the form
       setIsDialogOpen(false)
       setNewCustomer({
@@ -190,7 +252,7 @@ export default function ClientsPage() {
         meetings: [],
         createdAt: new Date()
       })
-      
+
       // Refresh the customers list
       fetchCustomers()
     } catch (error) {
@@ -205,16 +267,60 @@ export default function ClientsPage() {
     }
   }
 
-  const handleDeleteClient = (id: number) => {
-    setCustomers(customers.filter((client) => client.id !== id))
+  const handleDeleteClient = async () => {
+    if (!clientToDelete?._id) return
+
+    setDeletingClientId(clientToDelete._id)
+    try {
+      await deleteCustomer(clientToDelete._id)
+      toast({
+        title: "Cliente eliminado",
+        description: "El cliente se ha eliminado correctamente."
+      })
+      // Refresh the customers list
+      fetchCustomers()
+    } catch (err: any) {
+      console.error("Error deleting client:", err)
+      toast({
+        title: "Error",
+        description: err?.message || "No se pudo eliminar el cliente",
+        variant: "destructive"
+      })
+    } finally {
+      setDeletingClientId(null)
+      setShowDeleteDialog(false)
+      setClientToDelete(null)
+    }
   }
 
-  const handleToggleStatus = (id: number) => {
-    setCustomers(
-      customers.map((client) =>
-        client.id === id ? { ...client, status: client.status === "Activo" ? "Inactivo" : "Activo" } : client,
-      ),
-    )
+  const handleToggleStatus = async (client: Customer) => {
+    if (!client._id) return
+
+    setUpdatingClientId(client._id)
+    try {
+      const newActiveStatus = !client.active
+      await updateCustomer(client._id, { active: newActiveStatus })
+      toast({
+        title: client.active ? "Cliente desactivado" : "Cliente activado",
+        description: `El cliente se ha ${newActiveStatus ? 'activado' : 'desactivado'} correctamente.`
+      })
+      // Refresh the customers list
+      fetchCustomers()
+    } catch (err: any) {
+      console.error("Error updating client status:", err)
+      toast({
+        title: "Error",
+        description: err?.message || "No se pudo actualizar el estado del cliente",
+        variant: "destructive"
+      })
+    } finally {
+      setUpdatingClientId(null)
+    }
+  }
+
+  const openDeleteDialog = (client: Customer) => {
+    setClientToDelete(client)
+    setShowDeleteDialog(true)
   }
 
   useEffect(() => {
@@ -263,7 +369,7 @@ export default function ClientsPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="secondName">Segundo Nombre</Label>
+                  <Label htmlFor="secondName">Apellido</Label>
                   <Input
                     id="secondName"
                     value={newCustomer.secondName}
@@ -271,22 +377,50 @@ export default function ClientsPage() {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="dni">DNI <span className="text-red-500">*</span></Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="dni">DNI <span className="text-red-500">*</span></Label>
+                    {dniError && <span className="text-xs text-red-500">{dniError}</span>}
+                  </div>
                   <Input
                     id="dni"
                     value={newCustomer.dni}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, dni: e.target.value })}
+                    onChange={(e) => {
+                      setNewCustomer({ ...newCustomer, dni: e.target.value })
+                      // Clear error when user starts typing
+                      if (dniError) {
+                        setDniError("")
+                      }
+                    }}
+                    className={dniError ? "border-red-500" : ""}
+                    placeholder="ej: 12.345.678 o 12345678"
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Debe tener 7 u 8 dígitos (se permiten puntos).
+                  </p>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="cuit">CUIT <span className="text-red-500">*</span></Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="cuit">CUIT <span className="text-red-500">*</span></Label>
+                    {cuitError && <span className="text-xs text-red-500">{cuitError}</span>}
+                  </div>
                   <Input
                     id="cuit"
                     value={newCustomer.cuit}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, cuit: e.target.value })}
+                    onChange={(e) => {
+                      setNewCustomer({ ...newCustomer, cuit: e.target.value })
+                      // Clear error when user starts typing
+                      if (cuitError) {
+                        setCuitError("")
+                      }
+                    }}
+                    className={cuitError ? "border-red-500" : ""}
+                    placeholder="ej: 20-12345678-9 o 20123456789"
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Debe tener exactamente 11 dígitos (se permiten guiones).
+                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="cuil">CUIL</Label>
@@ -333,44 +467,44 @@ export default function ClientsPage() {
                     required
                   />
                 </div>
-              <div className="grid gap-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Contraseña <span className="text-red-500">*</span></Label>
-                  {passwordError && <span className="text-xs text-red-500">{passwordError}</span>}
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Contraseña <span className="text-red-500">*</span></Label>
+                    {passwordError && <span className="text-xs text-red-500">{passwordError}</span>}
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={newCustomer.password}
+                    onChange={(e) => {
+                      setNewCustomer({ ...newCustomer, password: e.target.value })
+                      // Clear error when user starts typing
+                      if (passwordError) {
+                        setPasswordError("")
+                      }
+                    }}
+                    className={passwordError ? "border-red-500" : ""}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    La contraseña debe tener al menos 8 caracteres, una mayúscula y un símbolo.
+                  </p>
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  value={newCustomer.password}
-                  onChange={(e) => {
-                    setNewCustomer({ ...newCustomer, password: e.target.value })
-                    // Clear error when user starts typing
-                    if (passwordError) {
-                      setPasswordError("")
-                    }
-                  }}
-                  className={passwordError ? "border-red-500" : ""}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  La contraseña debe tener al menos 8 caracteres, una mayúscula y un símbolo.
-                </p>
-              </div>
               </div>
               <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting || !!passwordError}>
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creando...
-                  </>
-                ) : (
-                  'Agregar Cliente'
-                )}
-              </Button>
+                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isSubmitting || !!passwordError || !!dniError || !!cuitError}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    'Agregar Cliente'
+                  )}
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
@@ -387,159 +521,212 @@ export default function ClientsPage() {
             <div className="flex items-center justify-center h-[50vh]">
               <div className="text-center py-8 flex justify-center items-center p-6">
                 <Loader2 className="animate-spin text-primary" size={24} />
-                <p className="px-6">Cargando clientes...</p>          
+                <p className="px-6">Cargando clientes...</p>
               </div>
             </div>
           </CardContent>
         )}
         {!loadingCustomers && (
-        <CardContent>
-          <div className="flex items-center mb-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar clientes..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+          <CardContent>
+            <div className="flex items-center mb-4">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar clientes..."
+                  className="pl-8"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Teléfono</TableHead>
-                  <TableHead>Correo Electrónico</TableHead>
-                  <TableHead className="hidden md:table-cell">Teléfono</TableHead>
-                  <TableHead className="hidden md:table-cell">Proyectos</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentItems.map((client) => (
-                  <TableRow key={client.userId}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        {client.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>{client.contactNumber}</TableCell>
-                    <TableCell>{client.email}</TableCell>
-                    <TableCell className="hidden md:table-cell">{client.phone}</TableCell>
-                    <TableCell className="hidden md:table-cell">{client.active ? "Activo" : "Inactivo"}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                          client.active
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Teléfono</TableHead>
+                    <TableHead>Correo Electrónico</TableHead>
+                    <TableHead className="hidden md:table-cell">Teléfono</TableHead>
+                    <TableHead className="hidden md:table-cell">Proyectos</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentItems.map((client) => (
+                    <TableRow key={client.userId}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-muted-foreground" />
+                          {client.name}
+                        </div>
+                      </TableCell>
+                      <TableCell>{client.contactNumber}</TableCell>
+                      <TableCell>{client.email}</TableCell>
+                      <TableCell className="hidden md:table-cell">{client.phone}</TableCell>
+                      <TableCell className="hidden md:table-cell">{client.active ? "Activo" : "Inactivo"}</TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${client.active
                             ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
                             : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
-                        }`}
-                      >
-                        {client.active ? "Activo" : "Inactivo"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Abrir menú</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => (window.location.href = `/admin/clients/${client.userId}`)}>
-                            Ver Detalles
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => (window.location.href = `/admin/clients/${client.userId}/edit`)}>
-                            Editar Cliente
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleToggleStatus(client.id)}>
-                            {client.active ? "Desactivar" : "Activar"}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-red-600 focus:text-red-600"
-                            onClick={() => handleDeleteClient(client.id)}
-                          >
-                            Eliminar Cliente
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                { !loadingCustomers && customersError && filteredClients?.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
-                      No se encontraron clientes. Intenta ajustar tu búsqueda o agrega un nuevo cliente.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-2 mt-4">
-              <div className="text-sm text-muted-foreground">
-                Mostrando {Math.min(currentPage * itemsPerPage, filteredClients.length)} de {filteredClients.length} clientes
-              </div>
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  Anterior
-                </Button>
-                <div className="flex items-center space-x-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    // Show pages around current page
-                    let pageNum = 0;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={currentPage === pageNum ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => handlePageChange(pageNum)}
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  Siguiente
-                </Button>
-              </div>
+                            }`}
+                        >
+                          {client.active ? "Activo" : "Inactivo"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                              <span className="sr-only">Abrir menú</span>
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => (window.location.href = `/admin/clients/${client.userId}`)}>
+                              Ver Detalles
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => (window.location.href = `/admin/clients/${client.userId}/edit`)}>
+                              Editar Cliente
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => handleToggleStatus(client)}
+                              disabled={updatingClientId === client._id}
+                            >
+                              {updatingClientId === client._id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Actualizando...
+                                </>
+                              ) : (
+                                client.active ? "Desactivar" : "Activar"
+                              )}
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600"
+                              onClick={() => openDeleteDialog(client)}
+                            >
+                              Eliminar Cliente
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!loadingCustomers && customersError && filteredClients?.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-6 text-muted-foreground">
+                        No se encontraron clientes. Intenta ajustar tu búsqueda o agrega un nuevo cliente.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
             </div>
-          )}
-        </CardContent>
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-2 mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Mostrando {Math.min(currentPage * itemsPerPage, filteredClients.length)} de {filteredClients.length} clientes
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    Anterior
+                  </Button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      // Show pages around current page
+                      let pageNum = 0;
+                      if (totalPages <= 5) {
+                        pageNum = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNum = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNum = totalPages - 4 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(pageNum)}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
         )}
       </Card>
+
+      {/* Diálogo de confirmación de eliminación */}
+      {showDeleteDialog && clientToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">¿Eliminar cliente?</h3>
+            <p className="text-gray-600 mb-2">
+              Estás a punto de eliminar a <strong>{clientToDelete.name}</strong>.
+            </p>
+            <p className="text-gray-600 mb-6">
+              Esta acción no se puede deshacer. Se eliminará permanentemente el cliente y toda su información asociada.
+            </p>
+            <div className="flex justify-end space-x-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowDeleteDialog(false)
+                  setClientToDelete(null)
+                }}
+                disabled={!!deletingClientId}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteClient}
+                disabled={!!deletingClientId}
+              >
+                {deletingClientId ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

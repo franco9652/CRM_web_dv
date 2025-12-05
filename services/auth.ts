@@ -1,4 +1,4 @@
-const API_URL = process.env.NODE_ENV === "development" 
+const API_URL = process.env.NODE_ENV === "development"
   ? "/api" // Proxy local en desarrollo
   : "https://crmdbsoft.zeabur.app"; // URL directa en producción
 
@@ -21,7 +21,7 @@ export interface LoginResponse {
 
 export async function loginUser(email: string, password: string): Promise<LoginResponse> {
   console.log(" Intentando login con:", { email });
-  
+
   try {
     const response = await fetch(`${API_URL}/login`, {
       method: "POST",

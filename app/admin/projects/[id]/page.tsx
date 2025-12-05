@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronLeft, FileText, Users, Loader2, Upload, Building, User } from "lucide-react"
+import { ChevronLeft, FileText, Users, Loader2, Upload, Building, User, Download } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -64,7 +64,7 @@ export default function ProjectDetailsPage() {
   const [selectedCustomer, setSelectedCustomer] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(true);
-  const [customerWorks, setCustomerWorks] = useState<Array<{_id: string, name: string}>>([]);
+  const [customerWorks, setCustomerWorks] = useState<Array<{ _id: string, name: string }>>([]);
   const [isLoadingWorks, setIsLoadingWorks] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -73,8 +73,9 @@ export default function ProjectDetailsPage() {
   const { toast } = useToast();
 
   const [newDocument, setNewDocument] = useState<any>({
-    
+
     project: "",
+    workId: "",
     category: "",
     description: "",
     url: "",
@@ -82,19 +83,18 @@ export default function ProjectDetailsPage() {
 
   interface UploadResponse {
     message: string
-    document: {
-      fileName: string
-      originalName: string
-      mimeType: string
-      size: number
-      url: string
-    }
+    name: string
+    url: string
+    fileName?: string
+    originalName?: string
+    mimeType?: string
+    size?: number
   }
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setNewDocument({ 
-        ...newDocument, 
+      setNewDocument({
+        ...newDocument,
         file: e.target.files[0],
         url: '' // Initialize with empty string, will be set after upload
       })
@@ -114,18 +114,33 @@ export default function ProjectDetailsPage() {
       const uploadPromises = Array.from(files).map(async (file) => {
         const uploadData = new FormData()
         uploadData.append('file', file)
-        uploadData.append('userId', userId)
-
-        if (!token) {
-          throw new Error('No se encontró el token de autenticación')
-        }
 
         if (!selectedCustomer) {
           throw new Error('Por favor seleccione un cliente');
         }
 
+        if (!token) {
+          throw new Error('No se encontró el token de autenticación')
+        }
+
+        // Enviar customerId (requerido por el backend)
+        uploadData.append('customerId', selectedCustomer)
+
+        // Agregar workId si está disponible
+        if (newDocument.workId) {
+          uploadData.append('workId', newDocument.workId)
+        }
+
+        // Agregar categoría y descripción si están disponibles
+        if (newDocument.category) {
+          uploadData.append('category', newDocument.category)
+        }
+        if (newDocument.description) {
+          uploadData.append('description', newDocument.description)
+        }
+
         const response: any = await axios.post<UploadResponse>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${selectedCustomer}/upload`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
           uploadData,
           {
             headers: {
@@ -143,10 +158,10 @@ export default function ProjectDetailsPage() {
           } as any
         )
 
-        if (response.data?.document?.url) {
+        if (response.data?.url) {
           return {
-            name: file.name,
-            url: response.data.document.url,
+            name: response.data.name || file.name,
+            url: response.data.url,
             size: file.size,
             type: file.type
           }
@@ -155,7 +170,7 @@ export default function ProjectDetailsPage() {
       })
 
       const uploadedFiles = await Promise.all(uploadPromises)
-      
+
       // Update documents state with new files
       const newDocs = uploadedFiles.map((file, index) => ({
         id: documents.length + index + 1,
@@ -171,26 +186,27 @@ export default function ProjectDetailsPage() {
       }))
 
       setDocuments(prev => [...prev, ...newDocs])
-      
+
       // Actualizar también la lista combinada
       setAllDocuments(prev => [...prev, ...newDocs])
-      
+
       toast({
         title: 'Éxito',
         description: 'Documentos subidos correctamente',
         variant: 'default',
       })
-      
+
       // Reset form
       setNewDocument({
         name: "",
         project: "",
+        workId: "",
         category: "",
         description: "",
         file: null,
         url: ""
       })
-      
+
     } catch (error) {
       console.error('Error uploading file:', error)
       toast({
@@ -205,45 +221,23 @@ export default function ProjectDetailsPage() {
     }
   }
 
-  // Función para combinar documentos del proyecto y del cliente
-  const combineDocuments = (projectData: Work | null, customersData: Customer[]) => {
+  // Función para obtener solo los documentos del proyecto
+  const getProjectDocuments = (projectData: Work | null) => {
     if (!projectData) return [];
-    
-    const combinedDocs: any[] = [];
-    
-    // Agregar documentos del proyecto
+
+    const projectDocs: any[] = [];
+
+    // Agregar solo documentos del proyecto
     if (projectData.documents && Array.isArray(projectData.documents)) {
       projectData.documents.forEach((doc: any) => {
-        combinedDocs.push({
+        projectDocs.push({
           ...doc,
-          source: 'project',
           displayName: doc.fileName || doc.originalName || doc.name
         });
       });
     }
-    
-    // Buscar el cliente correspondiente al proyecto
-    const projectCustomer = customersData.find(customer => 
-      customer._id === projectData.customerId || 
-      customer.name === projectData.customerName
-    );
-    
-    // Agregar documentos del cliente si existe
-    if (projectCustomer && projectCustomer.documents && Array.isArray(projectCustomer.documents)) {
-      projectCustomer.documents.forEach((doc: any) => {
-        combinedDocs.push({
-          ...doc,
-          source: 'customer',
-          displayName: doc.name,
-          fileName: doc.name,
-          originalName: doc.name,
-          mimeType: doc.name.split('.').pop()?.toUpperCase() || 'FILE',
-          uploadedAt: doc.uploadedAt
-        });
-      });
-    }
-    
-    return combinedDocs;
+
+    return projectDocs;
   };
 
   const getWorkData = async () => {
@@ -263,13 +257,13 @@ export default function ProjectDetailsPage() {
     getWorkData()
   }, [params.id])
 
-  // Actualizar documentos combinados cuando cambien el proyecto o los clientes
+  // Actualizar documentos cuando cambie el proyecto
   useEffect(() => {
-    if (project && customers.length > 0) {
-      const combinedDocs = combineDocuments(project, customers);
-      setAllDocuments(combinedDocs);
+    if (project) {
+      const projectDocs = getProjectDocuments(project);
+      setAllDocuments(projectDocs);
     }
-  }, [project, customers])
+  }, [project])
 
   useEffect(() => {
     // Get token from localStorage
@@ -281,7 +275,7 @@ export default function ProjectDetailsPage() {
     // Fetch customers
     const fetchCustomers = async () => {
       if (!authToken) return;
-      
+
       setIsLoadingCustomers(true);
       try {
         const customers = await getAllCustomers();
@@ -308,6 +302,7 @@ export default function ProjectDetailsPage() {
         setNewDocument((prev: any) => ({
           ...prev,
           project: "",
+          workId: "",
           url: "",
           name: "",
           category: "",
@@ -349,37 +344,37 @@ export default function ProjectDetailsPage() {
       return '-';
     }
     try {
-    const date = new Date(dateString)
-    return new Intl.DateTimeFormat("es-ES", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    }).format(date)
+      const date = new Date(dateString)
+      return new Intl.DateTimeFormat("es-ES", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(date)
     } catch (error) {
       console.error(`Error al formatear fecha: ${dateString}`, error);
       return '-';
     }
   }
 
-    // Procesar coordenadas para el enlace de Google Maps
-    let googleMapsUrl = null;
-    if (project?.workUbication) {
-      const parts = project.workUbication.split(', ');
-      if (parts.length === 2) {
-        const lat = parseFloat(parts[0]);
-        const lng = parseFloat(parts[1]);
-        if (!isNaN(lat) && !isNaN(lng)) {
-          googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
-        }
+  // Procesar coordenadas para el enlace de Google Maps
+  let googleMapsUrl = null;
+  if (project?.workUbication) {
+    const parts = project.workUbication.split(', ');
+    if (parts.length === 2) {
+      const lat = parseFloat(parts[0]);
+      const lng = parseFloat(parts[1]);
+      if (!isNaN(lat) && !isNaN(lng)) {
+        googleMapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
       }
     }
+  }
 
   if (loading && !error) {
     return (
       <div className="flex items-center justify-center h-[50vh]">
-          <div className="text-center py-8 flex justify-center items-center p-6">
+        <div className="text-center py-8 flex justify-center items-center p-6">
           <Loader2 className="animate-spin text-primary" size={24} />
-          <p className="px-6">Cargando proyectos...</p>          
+          <p className="px-6">Cargando proyectos...</p>
         </div>
       </div>
     )
@@ -401,18 +396,18 @@ export default function ProjectDetailsPage() {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error('No se pudo descargar el archivo');
-      
+
       const blob = await response.blob();
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      
+
       link.href = downloadUrl;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(downloadUrl);
-      
+
       toast({
         title: "Descarga iniciada",
         description: `El archivo ${fileName} se está descargando.`,
@@ -438,15 +433,14 @@ export default function ProjectDetailsPage() {
           <h1 className="text-2xl font-bold">{project?.name}</h1>
           <span
             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium 
-            ${
-              project?.statusWork === "activo"
+            ${project?.statusWork === "activo"
                 ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
                 : project?.statusWork === "En progreso"
                   ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300"
                   : "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-            }`}
+              }`}
           >
-            {project?.statusWork  }
+            {project?.statusWork}
           </span>
         </div>
       </div>
@@ -474,21 +468,21 @@ export default function ProjectDetailsPage() {
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Ubicación:</dt>
                     {
-                    googleMapsUrl ? (
-                      <div className="flex flex-col">
-                        <span className="font-semibold">{project?.workUbication}</span>
-                        <a 
-                          href={googleMapsUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="font-semibold text-primary hover:underline"
+                      googleMapsUrl ? (
+                        <div className="flex flex-col">
+                          <span className="font-semibold">{project?.workUbication}</span>
+                          <a
+                            href={googleMapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-semibold text-primary hover:underline"
                           >
-                        Ver en mapa 📍
-                      </a>
-                    </div>                
-                    ) : (
-                      <span className="font-semibold">{project?.address || 'No disponible'}</span>
-                    )}
+                            Ver en mapa 📍
+                          </a>
+                        </div>
+                      ) : (
+                        <span className="font-semibold">{project?.address || 'No disponible'}</span>
+                      )}
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Fecha de inicio:</dt>
@@ -547,181 +541,223 @@ export default function ProjectDetailsPage() {
               <CardDescription>Archivos y documentación relacionada con el proyecto</CardDescription>
             </CardHeader>
             <CardContent>
-          <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Upload className="mr-2 h-4 w-4" />
-              Subir Documento
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[550px]">
-            <DialogHeader>
-              <DialogTitle>Subir Nuevo Documento</DialogTitle>
-              <DialogDescription>
-                Sube un nuevo documento al sistema. Los documentos pueden ser compartidos con clientes y colaboradores.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="customer-select">Cliente</Label>
-                <Select 
-                  value={selectedCustomer} 
-                  onValueChange={setSelectedCustomer}
-                  required
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Seleccione un cliente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer._id} value={customer._id}>
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4" />
-                          {customer.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Subir Documento
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[550px]">
+                  <DialogHeader>
+                    <DialogTitle>Subir Nuevo Documento</DialogTitle>
+                    <DialogDescription>
+                      Sube un nuevo documento al sistema. Los documentos pueden ser compartidos con clientes y colaboradores.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="customer-select">Cliente</Label>
+                      <Select
+                        value={selectedCustomer}
+                        onValueChange={setSelectedCustomer}
+                        required
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccione un cliente" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {customers.map((customer) => (
+                            <SelectItem key={customer._id} value={customer._id}>
+                              <div className="flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                {customer.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="doc-project">Proyecto</Label>
-                  <Select
-                    value={newDocument.project}
-                    onValueChange={(value) => setNewDocument({ ...newDocument, project: value, url: newDocument.url || "" })}
-                    disabled={!selectedCustomer || isLoadingWorks || customerWorks.length === 0}
-                  >
-                    <SelectTrigger id="doc-project">
-                      <SelectValue placeholder={
-                        !selectedCustomer 
-                          ? "Primero seleccione un cliente" 
-                          : isLoadingWorks 
-                            ? "Cargando proyectos..."
-                            : customerWorks.length === 0
-                              ? "No hay proyectos para este cliente"
-                              : "Seleccionar proyecto"
-                      } />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customerWorks.map((work) => (
-                        <SelectItem key={work._id} value={work.name}>
-                          <div className="flex items-center gap-2">
-                            <Building className="h-4 w-4" />
-                            {work.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="doc-category">Categoría</Label>
-                  <Select
-                    value={newDocument.category}
-                    onValueChange={(value) => setNewDocument({ ...newDocument, category: value, url: newDocument.url || "" })}
-                  >
-                    <SelectTrigger id="doc-category">
-                      <SelectValue placeholder="Seleccionar categoría" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableCategories.map((category) => (
-                        <SelectItem key={category} value={category}>
-                          {category}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="doc-description">Descripción (opcional)</Label>
-                <Textarea
-                  id="doc-description"
-                  value={newDocument.description}
-                  onChange={(e) => setNewDocument({ ...newDocument, description: e.target.value, url: newDocument.url || "" })}
-                  placeholder="Breve descripción del contenido del documento"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="file-upload">Archivo</Label>
-                <Input 
-                  id="file-upload"
-                  type="file"
-                  onChange={(e) => {
-                    handleFileChange(e);
-                    handleFileUpload(e);
-                  }}
-                  multiple
-                />
-                <p className="text-xs text-muted-foreground">
-                  Formatos aceptados: PDF, DOCX, XLSX, DWG, JPG, PNG, ZIP (máx. 50MB)
-                </p>
-                {isUploading && (
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
-                      style={{ width: `${uploadProgress}%` }}
-                    ></div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label htmlFor="doc-project">Proyecto</Label>
+                        <Select
+                          value={newDocument.workId}
+                          onValueChange={(value) => {
+                            const selectedWork = customerWorks.find(work => work._id === value);
+                            setNewDocument({
+                              ...newDocument,
+                              workId: value,
+                              project: selectedWork?.name || "",
+                              url: newDocument.url || ""
+                            });
+                          }}
+                          disabled={!selectedCustomer || isLoadingWorks || customerWorks.length === 0}
+                        >
+                          <SelectTrigger id="doc-project">
+                            <SelectValue placeholder={
+                              !selectedCustomer
+                                ? "Primero seleccione un cliente"
+                                : isLoadingWorks
+                                  ? "Cargando proyectos..."
+                                  : customerWorks.length === 0
+                                    ? "No hay proyectos para este cliente"
+                                    : "Seleccionar proyecto"
+                            } />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {customerWorks.map((work) => (
+                              <SelectItem key={work._id} value={work._id}>
+                                <div className="flex items-center gap-2">
+                                  <Building className="h-4 w-4" />
+                                  {work.name}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="doc-category">Categoría</Label>
+                        <Select
+                          value={newDocument.category}
+                          onValueChange={(value) => setNewDocument({ ...newDocument, category: value, url: newDocument.url || "" })}
+                        >
+                          <SelectTrigger id="doc-category">
+                            <SelectValue placeholder="Seleccionar categoría" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {availableCategories.map((category) => (
+                              <SelectItem key={category} value={category}>
+                                {category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="doc-description">Descripción (opcional)</Label>
+                      <Textarea
+                        id="doc-description"
+                        value={newDocument.description}
+                        onChange={(e) => setNewDocument({ ...newDocument, description: e.target.value, url: newDocument.url || "" })}
+                        placeholder="Breve descripción del contenido del documento"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="file-upload">Archivo</Label>
+                      <Input
+                        id="file-upload"
+                        type="file"
+                        onChange={(e) => {
+                          handleFileChange(e);
+                          handleFileUpload(e);
+                        }}
+                        multiple
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Formatos aceptados: PDF, DOCX, XLSX, DWG, JPG, PNG, ZIP (máx. 50MB)
+                      </p>
+                      {isUploading && (
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                          <div
+                            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress}%` }}
+                          ></div>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-            <DialogFooter>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsUploadDialogOpen(false)}
-                disabled={isUploading}
-              >
-                Cancelar
-              </Button>
-              <Button 
-                onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={isUploading || !selectedCustomer || !newDocument.project}
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Subiendo...
-                  </>
-                ) : (
-                  'Seleccionar y Subir Documento'
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-              <div className="space-y-4">
+                  <DialogFooter>
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsUploadDialogOpen(false)}
+                      disabled={isUploading}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={() => document.getElementById('file-upload')?.click()}
+                      disabled={isUploading || !selectedCustomer || !newDocument.workId}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Subiendo...
+                        </>
+                      ) : (
+                        'Seleccionar y Subir Documento'
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+              <div className="space-y-4 mt-6">
                 {
                   allDocuments.length === 0 ? (
-                    <p>No hay documentos disponibles para este proyecto.</p>
-                  ) : (
-                  allDocuments.map((document: any, index: number) => (
-                    <div key={document._id || `doc-${index}`} className="flex items-start gap-4 p-4 border rounded-md">
-                      <div className="bg-primary/10 p-2 rounded-full">
-                        <FileText className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">{document.displayName || document.fileName || document.originalName || document.name}</p>
-                          {/* <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                            document.source === 'project' 
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
-                              : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                          }`}>
-                            {document.source === 'project' ? 'Proyecto' : 'Cliente'}
-                          </span> */}
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {document.mimeType || 'FILE'} • Subido el {formatDate(document.uploadedAt)}
-                        </p>
-                      </div>
-                      <Button size="sm" variant="outline" onClick={() => handleDownload(document.url, document.name)}>
-                        Descargar
-                      </Button>
+                    <div className="text-center py-8 text-muted-foreground">
+                      <FileText className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                      <p>No hay documentos disponibles para este proyecto.</p>
                     </div>
-                    ))
+                  ) : (
+                    allDocuments.map((document: any, index: number) => {
+                      // Formatear el tamaño del archivo
+                      const formatFileSize = (bytes: number) => {
+                        if (!bytes) return 'Tamaño desconocido';
+                        if (bytes < 1024) return `${bytes} B`;
+                        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+                        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+                      };
+
+                      return (
+                        <div key={document._id || `doc-${index}`} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors">
+                          <div className="bg-primary/10 p-3 rounded-lg">
+                            <FileText className="h-5 w-5 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-base truncate">
+                                  {document.originalName || document.displayName || document.fileName || document.name}
+                                </p>
+                              </div>
+                              {document.category && (
+                                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 whitespace-nowrap">
+                                  {document.category}
+                                </span>
+                              )}
+                            </div>
+
+                            {document.description && (
+                              <p className="text-sm text-foreground/80 mb-2 line-clamp-2">
+                                {document.description}
+                              </p>
+                            )}
+
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <span className="font-medium">{document.mimeType || 'FILE'}</span>
+                              </span>
+                              <span>•</span>
+                              <span>{formatFileSize(document.size)}</span>
+                              <span>•</span>
+                              <span>Subido el {formatDate(document.uploadedAt)}</span>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDownload(document.url, document.originalName || document.name)}
+                            className="shrink-0"
+                          >
+                            <Download className="mr-2 h-4 w-4" />
+                            Descargar
+                          </Button>
+                        </div>
+                      );
+                    })
                   )
                 }
               </div>
