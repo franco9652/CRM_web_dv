@@ -118,11 +118,11 @@ export async function deleteBudget(budgetId: string): Promise<DeleteBudgetRespon
     return data;
   } catch (error: unknown) {
     const apiError = error as ApiError;
-    const errorMessage = apiError?.response?.data?.error || 
-                        apiError?.response?.data?.message || 
-                        apiError?.message || 
-                        'Error desconocido al eliminar el presupuesto';
-    
+    const errorMessage = apiError?.response?.data?.error ||
+      apiError?.response?.data?.message ||
+      apiError?.message ||
+      'Error desconocido al eliminar el presupuesto';
+
     console.error('Error deleting budget:', errorMessage);
     throw new Error(errorMessage);
   }

@@ -60,26 +60,26 @@ export async function createCustomer(customerData: Omit<Customer, '_id' | 'userI
 export async function getAllCustomers(): Promise<Customer[]> {
   // Obtener primera página para conocer el total
   const firstResponse = await getCustomers(1);
-  
+
   if (firstResponse.totalPages === 1) {
     return firstResponse.customers;
   }
-  
+
   // Crear promesas para todas las páginas restantes
   const pagePromises: Promise<CustomersResponse>[] = [Promise.resolve(firstResponse)];
-  
+
   for (let page = 2; page <= firstResponse.totalPages; page++) {
     pagePromises.push(getCustomers(page));
   }
-  
+
   // Ejecutar todas las promesas en paralelo
   const allResponses = await Promise.all(pagePromises);
-  
+
   // Combinar todos los customers
   const allCustomers = allResponses.reduce((acc, response) => {
     return [...acc, ...response.customers];
   }, [] as Customer[]);
-  
+
   return allCustomers;
 }
 
@@ -87,16 +87,23 @@ export async function getAllCustomers(): Promise<Customer[]> {
  * Obtiene los customers asociados a un usuario dado.
  * @param userId ID del usuario
  */
-export async function getCustomersByUserId(userId?: string): Promise<{message: string, customer: Customer[]}> {
+export async function getCustomersByUserId(userId?: string): Promise<{ message: string, customer: Customer[] }> {
   if (!userId) throw new Error("userId inválido");
 
-  const { data } = await axios.get<{message: string, customer: Customer[]}>(`${API_URL}/getcustomersbyid/${userId}`);
+  const { data } = await axios.get<{ message: string, customer: Customer[] }>(`${API_URL}/getcustomersbyid/${userId}`);
   return data;
 }
 
 export async function updateCustomer(customerId: string, customerData: Partial<Customer>): Promise<Customer> {
   if (!customerId) throw new Error("ID de cliente inválido");
-  
+
   const { data } = await axios.put<Customer>(`${API_URL}/updateCustomer/${customerId}`, customerData);
+  return data;
+}
+
+export async function deleteCustomer(customerId: string): Promise<{ message: string }> {
+  if (!customerId) throw new Error("ID de cliente inválido");
+
+  const { data } = await axios.delete<{ message: string }>(`${API_URL}/deleteCustomer/${customerId}`);
   return data;
 }

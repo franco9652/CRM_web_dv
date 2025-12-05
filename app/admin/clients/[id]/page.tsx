@@ -145,6 +145,10 @@ export default function ClientDetailsPage() {
               <span>{'Nombre: ' + client.name}</span>
             </div>
             <div className="flex items-center">
+              <User className="h-5 w-5 text-muted-foreground mr-3" />
+              <span>{'Apellido: ' + client.secondName === undefined ? '-' : client.secondName}</span>
+            </div>
+            <div className="flex items-center">
               <Mail className="h-5 w-5 text-muted-foreground mr-3" />
               <span>{'Email: ' + client.email}</span>
             </div>
