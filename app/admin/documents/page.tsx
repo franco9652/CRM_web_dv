@@ -86,6 +86,7 @@ export default function DocumentsPage() {
   const [newDocument, setNewDocument] = useState({
     name: "",
     project: "",
+    workId: "",
     category: "",
     description: "",
     file: null as File | null,
@@ -149,6 +150,7 @@ export default function DocumentsPage() {
         setNewDocument(prev => ({
           ...prev,
           project: "",
+          workId: "",
           url: "",
           name: "",
           category: "",
@@ -342,6 +344,9 @@ export default function DocumentsPage() {
         if (newDocument.project) {
           uploadData.append('project', newDocument.project)
         }
+        if (newDocument.workId) {
+          uploadData.append('workId', newDocument.workId)
+        }
         if (newDocument.category) {
           uploadData.append('category', newDocument.category)
         }
@@ -422,6 +427,7 @@ export default function DocumentsPage() {
       setNewDocument({
         name: "",
         project: "",
+        workId: "",
         category: "",
         description: "",
         file: null,
@@ -514,8 +520,16 @@ export default function DocumentsPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="doc-project">Proyecto</Label>
                   <Select
-                    value={newDocument.project}
-                    onValueChange={(value) => setNewDocument({ ...newDocument, project: value, url: newDocument.url || "" })}
+                    value={newDocument.workId}
+                    onValueChange={(value) => {
+                      const selectedWork = customerWorks.find(work => work._id === value);
+                      setNewDocument({
+                        ...newDocument,
+                        workId: value,
+                        project: selectedWork?.name || "",
+                        url: newDocument.url || ""
+                      });
+                    }}
                     disabled={!selectedCustomer || isLoadingWorks || customerWorks.length === 0}
                   >
                     <SelectTrigger id="doc-project">
@@ -531,7 +545,7 @@ export default function DocumentsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {customerWorks.map((work) => (
-                        <SelectItem key={work._id} value={work.name}>
+                        <SelectItem key={work._id} value={work._id}>
                           <div className="flex items-center gap-2">
                             <Building className="h-4 w-4" />
                             {work.name}
@@ -603,7 +617,7 @@ export default function DocumentsPage() {
               </Button>
               <Button
                 onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={isUploading || !selectedCustomer || !newDocument.project}
+                disabled={isUploading || !selectedCustomer || !newDocument.workId}
               >
                 {isUploading ? (
                   <>

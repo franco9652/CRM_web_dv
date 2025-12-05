@@ -100,7 +100,7 @@ export default function ClientDocumentsPage() {
   // Estados para el formulario de subida
   const [documentFile, setDocumentFile] = useState<File | null>(null)
   const [documentProject, setDocumentProject] = useState("")
-  const [documentProjectId, setDocumentProjectId] = useState("")
+  const [documentWorkId, setDocumentWorkId] = useState("")
   const [documentCategory, setDocumentCategory] = useState("")
   const [documentName, setDocumentName] = useState("")
   const [documentDescription, setDocumentDescription] = useState("")
@@ -184,7 +184,7 @@ export default function ClientDocumentsPage() {
   // Handle customer selection change
   const handleCustomerChange = useCallback((customerId: string) => {
     setSelectedCustomerId(customerId);
-    setDocumentProjectId("");
+    setDocumentWorkId("");
     setDocumentProject("");
     fetchWorks(customerId);
   }, [user?.role]);
@@ -197,7 +197,7 @@ export default function ClientDocumentsPage() {
   const handleProjectChange = useCallback((value: string) => {
     const selectedWork = works.find(work => work._id === value);
     setDocumentProject(selectedWork?.name || '');
-    setDocumentProjectId(value);
+    setDocumentWorkId(value);
   }, [works]);
 
   const handleCategoryChange = useCallback((value: string) => {
@@ -336,7 +336,7 @@ export default function ClientDocumentsPage() {
     const newDocument = {
       name: documentName,
       project: documentProject,
-      projectId: documentProjectId,
+      workId: documentWorkId,
       category: documentCategory,
       description: documentDescription,
       file: documentFile,
@@ -353,8 +353,8 @@ export default function ClientDocumentsPage() {
         }
         uploadData.append('userId', userId);
 
-        if (newDocument.projectId) {
-          uploadData.append('workId', newDocument.projectId);
+        if (newDocument.workId) {
+          uploadData.append('workId', newDocument.workId);
         }
 
         if (!token) {
@@ -450,7 +450,7 @@ export default function ClientDocumentsPage() {
   };
 
   const handleUploadDocument = useCallback(async () => {
-    if (!documentProjectId) {
+    if (!documentWorkId) {
       toast({
         title: 'Error',
         description: 'Por favor seleccione un proyecto',
@@ -481,7 +481,7 @@ export default function ClientDocumentsPage() {
       }
 
       formData.append('userId', userId);
-      formData.append('workId', documentProjectId);
+      formData.append('workId', documentWorkId);
 
       if (documentName) formData.append('name', documentName);
       if (documentCategory) formData.append('category', documentCategory);
@@ -535,7 +535,7 @@ export default function ClientDocumentsPage() {
           setDocumentFile(null);
           setUploadProgress(0);
           setDocumentProject("");
-          setDocumentProjectId("");
+          setDocumentWorkId("");
           setDocumentCategory("");
           setDocumentName("");
           setDocumentDescription("");
@@ -562,13 +562,13 @@ export default function ClientDocumentsPage() {
     } finally {
       setIsUploading(false);
     }
-  }, [documentProjectId, documentFile, documentName, documentCategory, documentDescription, user, token]);
+  }, [documentWorkId, documentFile, documentName, documentCategory, documentDescription, user, token]);
 
   useEffect(() => {
     if (!isUploadDialogOpen) {
       setDocumentName('');
       setDocumentProject('');
-      setDocumentProjectId('');
+      setDocumentWorkId('');
       setDocumentCategory('');
       setDocumentDescription('');
       setDocumentFile(null);
@@ -633,7 +633,7 @@ export default function ClientDocumentsPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="doc-project">Proyecto</Label>
                   <Select
-                    value={documentProjectId}
+                    value={documentWorkId}
                     onValueChange={handleProjectChange}
                     disabled={!selectedCustomerId || works.length === 0}
                   >
