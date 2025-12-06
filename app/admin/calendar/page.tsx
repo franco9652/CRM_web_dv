@@ -168,6 +168,14 @@ export default function CalendarPage() {
 
   // Filter meetings based on search term, customer, and meeting type
   const filteredMeetings = meetings.filter((meeting) => {
+    if (!meeting) return false;
+
+    const term = (searchTerm || '').toLowerCase();
+
+    const meetingTitle = (meeting.title || '').toLowerCase();
+    const customerName = (meeting.customer?.name || '').toLowerCase();
+    const projectTitle = (meeting.project?.title || meeting.project?.name || '').toLowerCase();
+
     const matchesSearch =
       meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       meeting.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -627,8 +635,8 @@ export default function CalendarPage() {
                   <Select value={newMeeting.meetingType} onValueChange={(value) => setNewMeeting({ ...newMeeting, meetingType: value })}>
                     <SelectTrigger id="meetingType"><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Videollamada">Videollamada</SelectItem>
-                      <SelectItem value="Presencial">Presencial</SelectItem>
+                      <SelectItem value="virtual">Virtual</SelectItem>
+                      <SelectItem value="presencial">Presencial</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
