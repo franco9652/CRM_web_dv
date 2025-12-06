@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronLeft, FileText, Users, Loader2, Upload, Building, User, Download, Mail } from "lucide-react"
+import { ChevronLeft, FileText, Users, Loader2, Upload, Building, User, Download } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -18,7 +18,6 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import { getWorkById, getWorksByCustomerId, Work } from "@/services/works"
-import { sendWorkReport, SendReportInput } from "@/services/reports"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -72,13 +71,6 @@ export default function ProjectDetailsPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const { user } = useAuth();
   const { toast } = useToast();
-
-  // Estados para la funcionalidad de reportes
-  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
-  const [ccEmails, setCcEmails] = useState<string[]>([]);
-  const [ccInput, setCcInput] = useState("");
-  const [reportSubject, setReportSubject] = useState("");
-  const [isSendingReport, setIsSendingReport] = useState(false);
 
   const [newDocument, setNewDocument] = useState<any>({
 
@@ -430,92 +422,6 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  // Funciones para manejar la generación de reportes
-  const handleAddCcEmail = () => {
-    const email = ccInput.trim();
-    if (email && email.includes('@')) {
-      if (!ccEmails.includes(email)) {
-        setCcEmails([...ccEmails, email]);
-        setCcInput("");
-      } else {
-        toast({
-          title: "Email duplicado",
-          description: "Este email ya está en la lista de CC",
-          variant: "destructive",
-        });
-      }
-    } else {
-      toast({
-        title: "Email inválido",
-        description: "Por favor ingrese un email válido",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleRemoveCcEmail = (emailToRemove: string) => {
-    setCcEmails(ccEmails.filter(email => email !== emailToRemove));
-  };
-
-  const handleOpenReportDialog = () => {
-    setCcEmails([]);
-    setCcInput("");
-    setReportSubject("");
-    setIsReportDialogOpen(true);
-  };
-
-  const handleSendReport = async () => {
-    if (!params.id) {
-      toast({
-        title: "Error",
-        description: "No se pudo identificar el proyecto",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSendingReport(true);
-
-    try {
-      const reportData: SendReportInput = {
-        dryRun: false,
-      };
-
-      // Agregar CC si existen
-      if (ccEmails.length > 0) {
-        reportData.cc = ccEmails;
-      }
-
-      // Agregar asunto personalizado si existe
-      if (reportSubject.trim()) {
-        reportData.subjectOverride = reportSubject.trim();
-      }
-
-      const response = await sendWorkReport(params.id, reportData);
-
-      toast({
-        title: "Reporte enviado",
-        description: response.message || "El reporte ha sido enviado exitosamente por email",
-      });
-
-      setIsReportDialogOpen(false);
-      setCcEmails([]);
-      setCcInput("");
-      setReportSubject("");
-
-    } catch (error: any) {
-      console.error('Error sending report:', error);
-      toast({
-        title: "Error al enviar reporte",
-        description: error.message || "No se pudo enviar el reporte. Por favor, inténtalo de nuevo.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSendingReport(false);
-    }
-  };
-
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -537,10 +443,6 @@ export default function ProjectDetailsPage() {
             {project?.statusWork}
           </span>
         </div>
-        <Button onClick={handleOpenReportDialog} disabled={isSendingReport}>
-          <Mail className="mr-2 h-4 w-4" />
-          Generar Reporte
-        </Button>
       </div>
 
       <Card>
@@ -863,115 +765,7 @@ export default function ProjectDetailsPage() {
           </Card>
         )}
       </Tabs>
-
-      {/* Diálogo de Generación de Reportes */}
-      <Dialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen}>
-        <DialogContent className="sm:max-w-[550px]">
-          <DialogHeader>
-            <DialogTitle>Generar Reporte del Proyecto</DialogTitle>
-            <DialogDescription>
-              Envía un reporte detallado del proyecto por email. Puedes agregar destinatarios en copia (CC) y personalizar el asunto.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            {/* Campo de asunto personalizado */}
-            <div className="grid gap-2">
-              <Label htmlFor="report-subject">Asunto del Email (Opcional)</Label>
-              <Input
-                id="report-subject"
-                value={reportSubject}
-                onChange={(e) => setReportSubject(e.target.value)}
-                placeholder="Ej: Reporte de obra - Edificio Demo Caballito"
-              />
-              <p className="text-xs text-muted-foreground">
-                Si no se especifica, se usará el asunto predeterminado
-              </p>
-            </div>
-
-            {/* Campo para agregar emails CC */}
-            <div className="grid gap-2">
-              <Label htmlFor="cc-emails">Destinatarios en Copia (CC)</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="cc-emails"
-                  type="email"
-                  value={ccInput}
-                  onChange={(e) => setCcInput(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddCcEmail();
-                    }
-                  }}
-                  placeholder="ejemplo@email.com"
-                />
-                <Button
-                  type="button"
-                  onClick={handleAddCcEmail}
-                  variant="outline"
-                  size="sm"
-                >
-                  Agregar
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Presiona Enter o haz clic en Agregar para añadir emails adicionales
-              </p>
-            </div>
-
-            {/* Lista de emails CC agregados */}
-            {ccEmails.length > 0 && (
-              <div className="grid gap-2">
-                <Label>Destinatarios CC agregados:</Label>
-                <div className="space-y-2">
-                  {ccEmails.map((email, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-2 bg-muted rounded-md"
-                    >
-                      <span className="text-sm">{email}</span>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveCcEmail(email)}
-                        className="h-6 w-6 p-0"
-                      >
-                        ×
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsReportDialogOpen(false)}
-              disabled={isSendingReport}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSendReport}
-              disabled={isSendingReport}
-            >
-              {isSendingReport ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Enviando...
-                </>
-              ) : (
-                <>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Enviar Reporte
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
+
