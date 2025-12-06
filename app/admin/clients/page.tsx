@@ -547,7 +547,6 @@ export default function ClientsPage() {
                     <TableHead>Nombre y Apellido</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Correo Electrónico</TableHead>
-                    <TableHead className="hidden md:table-cell">Teléfono</TableHead>
                     <TableHead className="hidden md:table-cell">Proyectos</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
