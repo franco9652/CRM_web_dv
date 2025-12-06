@@ -544,7 +544,7 @@ export default function ClientsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nombre</TableHead>
+                    <TableHead>Nombre y Apellido</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Correo Electrónico</TableHead>
                     <TableHead className="hidden md:table-cell">Teléfono</TableHead>
@@ -559,7 +559,7 @@ export default function ClientsPage() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <Building className="h-4 w-4 text-muted-foreground" />
-                          {client.name}
+                          {client.name + " " + (client.secondName === undefined ? ' ' : client.secondName)}
                         </div>
                       </TableCell>
                       <TableCell>{client.contactNumber}</TableCell>
