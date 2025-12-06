@@ -26,11 +26,11 @@ import {
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar, Clock, Edit, Link, MapPin, MoreHorizontal, Plus, Search, Trash, Users, Video } from "lucide-react"
-import {
-  getAllMeetings,
-  createMeeting,
-  updateMeeting,
-  deleteMeeting,
+import { 
+  getAllMeetings, 
+  createMeeting, 
+  updateMeeting, 
+  deleteMeeting, 
   type Meeting,
   type CreateMeetingData
 } from "@/services/meetings"
@@ -169,9 +169,9 @@ export default function CalendarPage() {
   // Filter meetings based on search term, customer, and meeting type
   const filteredMeetings = meetings.filter((meeting) => {
     const matchesSearch =
-      (meeting.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (meeting.customer?.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (meeting.project?.title || '').toLowerCase().includes(searchTerm.toLowerCase());
+      meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      meeting.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      meeting.project?.title.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesCustomer = customerFilter === "Todos" || meeting.customer?.name === customerFilter;
     const matchesType = typeFilter === "Todos" || meeting.meetingType === typeFilter;
@@ -229,7 +229,7 @@ export default function CalendarPage() {
         address: newMeeting.meetingType === "Presencial" ? newMeeting.address : undefined,
         description: newMeeting.description,
       };
-
+      
       await createMeeting(meetingDataForApi);
       await fetchMeetingsAndUpdateState();
 
@@ -271,7 +271,7 @@ export default function CalendarPage() {
         address: newMeeting.meetingType === "Presencial" ? newMeeting.address : undefined,
         description: newMeeting.description,
       };
-
+      
       await updateMeeting(selectedMeeting._id, meetingDataForApi);
       await fetchMeetingsAndUpdateState();
 
@@ -705,60 +705,58 @@ export default function CalendarPage() {
                     </TableCell>
                   </TableRow>
                 ) : paginatedMeetings.length > 0 ? (
-                  paginatedMeetings.map((meeting) => {
-                    return (
-                      <TableRow key={meeting._id}>
-                        <TableCell className="font-medium">
-                          <div>{meeting.title}</div>
-                          <div className="text-xs text-muted-foreground">{meeting.description?.substring(0, 50) ?? ''}...</div>
-                        </TableCell>
-                        <TableCell>
-                          <div>{meeting?.project?.name}</div>
-                          <div className="text-xs text-muted-foreground">{meeting?.customer?.name}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              <span>{formatDate(meeting.date)}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-muted-foreground" />
-                              <span>{meeting.time} ({meeting.duration})</span>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell">
+                  paginatedMeetings.map((meeting) => { return (
+                  <TableRow key={meeting._id}>
+                    <TableCell className="font-medium">
+                      <div>{meeting.title}</div>
+                      <div className="text-xs text-muted-foreground">{meeting.description?.substring(0, 50) ?? ''}...</div>
+                    </TableCell>
+                    <TableCell>
+                      <div>{meeting?.project?.name}</div>
+                      <div className="text-xs text-muted-foreground">{meeting?.customer?.name}</div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          <span>{formatDate(meeting.date)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-muted-foreground" />
+                          <span>{meeting.time} ({meeting.duration})</span>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex items-center gap-1">
+                        {meeting.meetingType === "Videollamada" ? <Video className="h-3 w-3 text-muted-foreground" /> : <MapPin className="h-3 w-3 text-muted-foreground" />}
+                        <span>{meeting.meetingType}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {meeting.meetingType === "Videollamada" ? (
                           <div className="flex items-center gap-1">
-                            {meeting.meetingType === "Videollamada" ? <Video className="h-3 w-3 text-muted-foreground" /> : <MapPin className="h-3 w-3 text-muted-foreground" />}
-                            <span>{meeting.meetingType}</span>
+                            <Link className="h-3 w-3" />
+                            <span className="truncate max-w-[150px]">{meeting.meetingLink}</span>
                           </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {meeting.meetingType === "Videollamada" ? (
-                              <div className="flex items-center gap-1">
-                                <Link className="h-3 w-3" />
-                                <span className="truncate max-w-[150px]">{meeting.meetingLink}</span>
-                              </div>
-                            ) : (meeting.address)}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Abrir menú</span></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Acciones</DropdownMenuLabel>
-                              <DropdownMenuItem onClick={() => openEditDialog(meeting)}><Edit className="mr-2 h-4 w-4" />Editar Reunión</DropdownMenuItem>
-                              {meeting.meetingType === "Videollamada" && meeting.meetingLink && (
-                                <DropdownMenuItem onClick={() => window.open(meeting.meetingLink, "_blank")}><Video className="mr-2 h-4 w-4" />Unirse a la Reunión</DropdownMenuItem>
-                              )}
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => openDeleteDialog(meeting)}><Trash className="mr-2 h-4 w-4" />Cancelar Reunión</DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
+                        ) : ( meeting.address )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreHorizontal className="h-4 w-4" /><span className="sr-only">Abrir menú</span></Button></DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => openEditDialog(meeting)}><Edit className="mr-2 h-4 w-4" />Editar Reunión</DropdownMenuItem>
+                          {meeting.meetingType === "Videollamada" && meeting.meetingLink && (
+                            <DropdownMenuItem onClick={() => window.open(meeting.meetingLink, "_blank")}><Video className="mr-2 h-4 w-4" />Unirse a la Reunión</DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={() => openDeleteDialog(meeting)}><Trash className="mr-2 h-4 w-4" />Cancelar Reunión</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                  )})
                 ) : (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
@@ -830,108 +828,108 @@ export default function CalendarPage() {
             <DialogTitle>Editar Reunión</DialogTitle>
             <DialogDescription>Modifica los detalles de la reunión programada.</DialogDescription>
           </DialogHeader>
-          {/* Form content is identical to Add Dialog, just pre-filled */}
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
-              <Label htmlFor="edit-title">Título de la Reunión</Label>
-              <Input id="edit-title" value={newMeeting.title} onChange={(e) => setNewMeeting({ ...newMeeting, title: e.target.value })} />
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-customer">Cliente</Label>
-              <Select value={newMeeting.customer._id} onValueChange={(value) => {
-                const selectedCustomer = customers.find(c => c._id === value);
-                if (selectedCustomer) setNewMeeting(prev => ({
-                  ...prev,
-                  customer: selectedCustomer,
-                  project: { _id: "", title: "", name: "", ID: "", userId: [] }
-                }));
-              }}>
-                <SelectTrigger id="edit-customer"><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
-                <SelectContent>{customers.map((customer) => (<SelectItem key={customer._id} value={customer._id}>{customer.name}</SelectItem>))}</SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="edit-project">Proyecto</Label>
-              <Select
-                value={newMeeting.project._id}
-                onValueChange={(value) => {
-                  const selectedProject = customerProjects.find(p => p._id === value);
-                  if (selectedProject) {
-                    setNewMeeting(prev => ({
-                      ...prev,
-                      project: {
-                        _id: selectedProject._id,
-                        title: selectedProject.title || selectedProject.name || 'Sin título',
-                        name: selectedProject.name || selectedProject.title || 'Sin nombre',
-                        ID: selectedProject.ID || '',
-                        userId: selectedProject.userId || []
-                      }
-                    }));
-                  }
-                }}
-                disabled={!newMeeting.customer._id || loadingProjects}
-              >
-                <SelectTrigger id="edit-project">
-                  {loadingProjects ? (
-                    <span className="text-muted-foreground">Cargando proyectos...</span>
-                  ) : !newMeeting.customer._id ? (
-                    <span className="text-muted-foreground">Seleccione un cliente primero</span>
-                  ) : customerProjects.length === 0 ? (
-                    <span className="text-muted-foreground">No hay proyectos disponibles</span>
-                  ) : (
-                    <SelectValue placeholder="Seleccionar proyecto" />
-                  )}
-                </SelectTrigger>
-                <SelectContent>
-                  {customerProjects.map((project) => (
-                    <SelectItem key={project._id} value={project._id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+           {/* Form content is identical to Add Dialog, just pre-filled */}
+           <div className="grid gap-4 py-4">
               <div className="grid gap-2">
-                <Label htmlFor="edit-date">Fecha</Label>
-                <Input id="edit-date" type="date" value={newMeeting.date.toISOString().split('T')[0]} onChange={(e) => setNewMeeting({ ...newMeeting, date: new Date(e.target.value) })} />
+                <Label htmlFor="edit-title">Título de la Reunión</Label>
+                <Input id="edit-title" value={newMeeting.title} onChange={(e) => setNewMeeting({ ...newMeeting, title: e.target.value })} />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="edit-time">Hora</Label>
-                <Input id="edit-time" type="time" value={newMeeting.time} onChange={(e) => setNewMeeting({ ...newMeeting, time: e.target.value })} />
+                <Label htmlFor="edit-customer">Cliente</Label>
+                <Select value={newMeeting.customer._id} onValueChange={(value) => {
+                  const selectedCustomer = customers.find(c => c._id === value);
+                  if (selectedCustomer) setNewMeeting(prev => ({ 
+                    ...prev, 
+                    customer: selectedCustomer, 
+                    project: { _id: "", title: "", name: "", ID: "", userId: [] } 
+                  }));
+                }}>
+                  <SelectTrigger id="edit-customer"><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
+                  <SelectContent>{customers.map((customer) => (<SelectItem key={customer._id} value={customer._id}>{customer.name}</SelectItem>))}</SelectContent>
+                </Select>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="edit-duration">Duración</Label>
-                <Input id="edit-duration" value={newMeeting.duration} onChange={(e) => setNewMeeting({ ...newMeeting, duration: e.target.value })} />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-meetingType">Tipo de Reunión</Label>
-                <Select value={newMeeting.meetingType} onValueChange={(value) => setNewMeeting({ ...newMeeting, meetingType: value })}>
-                  <SelectTrigger id="edit-meetingType"><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+                <Label htmlFor="edit-project">Proyecto</Label>
+                <Select 
+                  value={newMeeting.project._id} 
+                  onValueChange={(value) => {
+                    const selectedProject = customerProjects.find(p => p._id === value);
+                    if (selectedProject) {
+                      setNewMeeting(prev => ({
+                        ...prev, 
+                        project: { 
+                          _id: selectedProject._id, 
+                          title: selectedProject.title || selectedProject.name || 'Sin título',
+                          name: selectedProject.name || selectedProject.title || 'Sin nombre',
+                          ID: selectedProject.ID || '',
+                          userId: selectedProject.userId || []
+                        }
+                      }));
+                    }
+                  }} 
+                  disabled={!newMeeting.customer._id || loadingProjects}
+                >
+                  <SelectTrigger id="edit-project">
+                    {loadingProjects ? (
+                      <span className="text-muted-foreground">Cargando proyectos...</span>
+                    ) : !newMeeting.customer._id ? (
+                      <span className="text-muted-foreground">Seleccione un cliente primero</span>
+                    ) : customerProjects.length === 0 ? (
+                      <span className="text-muted-foreground">No hay proyectos disponibles</span>
+                    ) : (
+                      <SelectValue placeholder="Seleccionar proyecto" />
+                    )}
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Videollamada">Videollamada</SelectItem>
-                    <SelectItem value="Presencial">Presencial</SelectItem>
+                    {customerProjects.map((project) => (
+                      <SelectItem key={project._id} value={project._id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            {newMeeting.meetingType === "Presencial" ? (
-              <div className="grid gap-2">
-                <Label htmlFor="edit-address">Ubicación</Label>
-                <Input id="edit-address" value={newMeeting.address} onChange={(e) => setNewMeeting({ ...newMeeting, address: e.target.value })} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-date">Fecha</Label>
+                  <Input id="edit-date" type="date" value={newMeeting.date.toISOString().split('T')[0]} onChange={(e) => setNewMeeting({ ...newMeeting, date: new Date(e.target.value) })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-time">Hora</Label>
+                  <Input id="edit-time" type="time" value={newMeeting.time} onChange={(e) => setNewMeeting({ ...newMeeting, time: e.target.value })} />
+                </div>
               </div>
-            ) : (
-              <div className="grid gap-2">
-                <Label htmlFor="edit-meetingLink">Enlace de la Reunión</Label>
-                <Input id="edit-meetingLink" value={newMeeting.meetingLink} onChange={(e) => setNewMeeting({ ...newMeeting, meetingLink: e.target.value })} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-duration">Duración</Label>
+                  <Input id="edit-duration" value={newMeeting.duration} onChange={(e) => setNewMeeting({ ...newMeeting, duration: e.target.value })} />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-meetingType">Tipo de Reunión</Label>
+                  <Select value={newMeeting.meetingType} onValueChange={(value) => setNewMeeting({ ...newMeeting, meetingType: value })}>
+                    <SelectTrigger id="edit-meetingType"><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Videollamada">Videollamada</SelectItem>
+                      <SelectItem value="Presencial">Presencial</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            )}
-            <div className="grid gap-2">
-              <Label htmlFor="edit-description">Descripción</Label>
-              <Textarea id="edit-description" value={newMeeting.description} onChange={(e) => setNewMeeting({ ...newMeeting, description: e.target.value })} />
-            </div>
+              {newMeeting.meetingType === "Presencial" ? (
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-address">Ubicación</Label>
+                  <Input id="edit-address" value={newMeeting.address} onChange={(e) => setNewMeeting({ ...newMeeting, address: e.target.value })} />
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label htmlFor="edit-meetingLink">Enlace de la Reunión</Label>
+                  <Input id="edit-meetingLink" value={newMeeting.meetingLink} onChange={(e) => setNewMeeting({ ...newMeeting, meetingLink: e.target.value })} />
+                </div>
+              )}
+              <div className="grid gap-2">
+                <Label htmlFor="edit-description">Descripción</Label>
+                <Textarea id="edit-description" value={newMeeting.description} onChange={(e) => setNewMeeting({ ...newMeeting, description: e.target.value })} />
+              </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancelar</Button>
