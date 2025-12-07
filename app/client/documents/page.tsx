@@ -100,7 +100,7 @@ export default function ClientDocumentsPage() {
   // Estados para el formulario de subida
   const [documentFile, setDocumentFile] = useState<File | null>(null)
   const [documentProject, setDocumentProject] = useState("")
-  const [documentProjectId, setDocumentProjectId] = useState("")
+  const [documentWorkId, setDocumentWorkId] = useState("")
   const [documentCategory, setDocumentCategory] = useState("")
   const [documentName, setDocumentName] = useState("")
   const [documentDescription, setDocumentDescription] = useState("")
@@ -184,7 +184,7 @@ export default function ClientDocumentsPage() {
   // Handle customer selection change
   const handleCustomerChange = useCallback((customerId: string) => {
     setSelectedCustomerId(customerId);
-    setDocumentProjectId("");
+    setDocumentWorkId("");
     setDocumentProject("");
     fetchWorks(customerId);
   }, [user?.role]);
@@ -197,7 +197,7 @@ export default function ClientDocumentsPage() {
   const handleProjectChange = useCallback((value: string) => {
     const selectedWork = works.find(work => work._id === value);
     setDocumentProject(selectedWork?.name || '');
-    setDocumentProjectId(value);
+    setDocumentWorkId(value);
   }, [works]);
 
   const handleCategoryChange = useCallback((value: string) => {
@@ -310,13 +310,12 @@ export default function ClientDocumentsPage() {
 
   interface UploadResponse {
     message: string;
-    document: {
-      fileName: string;
-      originalName: string;
-      mimeType: string;
-      size: number;
-      url: string;
-    };
+    name: string;
+    url: string;
+    fileName?: string;
+    originalName?: string;
+    mimeType?: string;
+    size?: number;
   }
 
   interface UploadedFile {
@@ -336,7 +335,7 @@ export default function ClientDocumentsPage() {
     const newDocument = {
       name: documentName,
       project: documentProject,
-      projectId: documentProjectId,
+      workId: documentWorkId,
       category: documentCategory,
       description: documentDescription,
       file: documentFile,
@@ -347,18 +346,28 @@ export default function ClientDocumentsPage() {
         const uploadData = new FormData();
         uploadData.append('file', file);
 
-        const userId = user?.role === 'customer' ? user.customerId : user?._id;
-        if (!userId) {
-          throw new Error('ID de usuario o cliente no disponible');
-        }
-        uploadData.append('userId', userId);
-
-        if (newDocument.projectId) {
-          uploadData.append('workId', newDocument.projectId);
+        if (!selectedCustomerId) {
+          throw new Error('Por favor seleccione un cliente');
         }
 
         if (!token) {
           throw new Error('No se encontró el token de autenticación');
+        }
+
+        // Enviar customerId (requerido por el backend)
+        uploadData.append('customerId', selectedCustomerId);
+
+        // Agregar workId si está disponible
+        if (newDocument.workId) {
+          uploadData.append('workId', newDocument.workId);
+        }
+
+        // Agregar categoría y descripción si están disponibles
+        if (newDocument.category) {
+          uploadData.append('category', newDocument.category);
+        }
+        if (newDocument.description) {
+          uploadData.append('description', newDocument.description);
         }
 
         const config = {
@@ -378,15 +387,15 @@ export default function ClientDocumentsPage() {
 
         try {
           const response = await axios.post<UploadResponse>(
-            `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
+            `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
             uploadData,
             config as any
           );
 
-          if (response.data?.document?.url) {
+          if (response.data?.url) {
             return {
-              name: file.name,
-              url: response.data.document.url,
+              name: response.data.name || file.name,
+              url: response.data.url,
               size: file.size,
               type: file.type
             };
@@ -450,7 +459,7 @@ export default function ClientDocumentsPage() {
   };
 
   const handleUploadDocument = useCallback(async () => {
-    if (!documentProjectId) {
+    if (!documentWorkId) {
       toast({
         title: 'Error',
         description: 'Por favor seleccione un proyecto',
@@ -475,14 +484,19 @@ export default function ClientDocumentsPage() {
       const formData = new FormData();
       formData.append('file', documentFile);
 
-      const userId = user?.role === 'customer' ? user.customerId : user?._id;
-      if (!userId) {
-        throw new Error('ID de usuario o cliente no disponible');
+      if (!selectedCustomerId) {
+        throw new Error('Por favor seleccione un cliente');
       }
 
-      formData.append('userId', userId);
-      formData.append('workId', documentProjectId);
+      // Enviar customerId (requerido por el backend)
+      formData.append('customerId', selectedCustomerId);
 
+      // Agregar workId si está disponible
+      if (documentWorkId) {
+        formData.append('workId', documentWorkId);
+      }
+
+      // Agregar otros campos si están disponibles
       if (documentName) formData.append('name', documentName);
       if (documentCategory) formData.append('category', documentCategory);
       if (documentDescription) formData.append('description', documentDescription);
@@ -503,7 +517,7 @@ export default function ClientDocumentsPage() {
 
       try {
         const response: any = await axios.post<{ url: string }>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${userId}/upload`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
           formData,
           {
             headers: {
@@ -518,11 +532,11 @@ export default function ClientDocumentsPage() {
                 setUploadProgress(percentCompleted);
               }
             }
-          } as any // Usamos 'as any' temporalmente para evitar problemas de tipos
+          } as any
         );
 
         // Verificar si la subida fue exitosa
-        if (response.data?.document?.url) {
+        if (response.data?.url) {
           toast({
             title: "¡Éxito!",
             description: "El archivo se ha subido correctamente.",
@@ -535,7 +549,7 @@ export default function ClientDocumentsPage() {
           setDocumentFile(null);
           setUploadProgress(0);
           setDocumentProject("");
-          setDocumentProjectId("");
+          setDocumentWorkId("");
           setDocumentCategory("");
           setDocumentName("");
           setDocumentDescription("");
@@ -562,13 +576,13 @@ export default function ClientDocumentsPage() {
     } finally {
       setIsUploading(false);
     }
-  }, [documentProjectId, documentFile, documentName, documentCategory, documentDescription, user, token]);
+  }, [documentWorkId, documentFile, documentName, documentCategory, documentDescription, user, token]);
 
   useEffect(() => {
     if (!isUploadDialogOpen) {
       setDocumentName('');
       setDocumentProject('');
-      setDocumentProjectId('');
+      setDocumentWorkId('');
       setDocumentCategory('');
       setDocumentDescription('');
       setDocumentFile(null);
@@ -633,7 +647,7 @@ export default function ClientDocumentsPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="doc-project">Proyecto</Label>
                   <Select
-                    value={documentProjectId}
+                    value={documentWorkId}
                     onValueChange={handleProjectChange}
                     disabled={!selectedCustomerId || works.length === 0}
                   >

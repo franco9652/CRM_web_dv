@@ -628,8 +628,8 @@ export default function CalendarPage() {
                   <Select value={newMeeting.meetingType} onValueChange={(value) => setNewMeeting({ ...newMeeting, meetingType: value })}>
                     <SelectTrigger id="meetingType"><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Videollamada">Videollamada</SelectItem>
-                      <SelectItem value="Presencial">Presencial</SelectItem>
+                      <SelectItem value="virtual">Virtual</SelectItem>
+                      <SelectItem value="presencial">Presencial</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -682,8 +682,8 @@ export default function CalendarPage() {
               <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Filtrar por tipo" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Todos">Todos los Tipos</SelectItem>
-                <SelectItem value="Videollamada">Videollamada</SelectItem>
-                <SelectItem value="Presencial">Presencial</SelectItem>
+                <SelectItem value="virtual">Virtual</SelectItem>
+                <SelectItem value="presencial">Presencial</SelectItem>
               </SelectContent>
             </Select>
           </div>

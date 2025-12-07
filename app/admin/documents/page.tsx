@@ -86,6 +86,7 @@ export default function DocumentsPage() {
   const [newDocument, setNewDocument] = useState({
     name: "",
     project: "",
+    workId: "",
     category: "",
     description: "",
     file: null as File | null,
@@ -149,6 +150,7 @@ export default function DocumentsPage() {
         setNewDocument(prev => ({
           ...prev,
           project: "",
+          workId: "",
           url: "",
           name: "",
           category: "",
@@ -336,18 +338,33 @@ export default function DocumentsPage() {
       const uploadPromises = Array.from(files).map(async (file) => {
         const uploadData = new FormData()
         uploadData.append('file', file)
-        uploadData.append('userId', userId)
-
-        if (!token) {
-          throw new Error('No se encontró el token de autenticación')
-        }
 
         if (!selectedCustomer) {
           throw new Error('Por favor seleccione un cliente');
         }
 
+        if (!token) {
+          throw new Error('No se encontró el token de autenticación')
+        }
+
+        // Enviar customerId (requerido por el backend)
+        uploadData.append('customerId', selectedCustomer)
+
+        // Agregar workId si está seleccionado
+        if (newDocument.workId) {
+          uploadData.append('workId', newDocument.workId)
+        }
+
+        // Agregar categoría y descripción si están disponibles
+        if (newDocument.category) {
+          uploadData.append('category', newDocument.category)
+        }
+        if (newDocument.description) {
+          uploadData.append('description', newDocument.description)
+        }
+
         const response: any = await axios.post<UploadResponse>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${selectedCustomer}/upload`,
+          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
           uploadData,
           {
             headers: {
@@ -365,10 +382,10 @@ export default function DocumentsPage() {
           } as any
         )
 
-        if (response.data?.document?.url) {
+        if (response.data?.url) {
           return {
-            name: file.name,
-            url: response.data.document.url,
+            name: response.dataname || file.name,
+            url: response.data.url,
             size: file.size,
             type: file.type
           }
@@ -411,6 +428,7 @@ export default function DocumentsPage() {
       setNewDocument({
         name: "",
         project: "",
+        workId: "",
         category: "",
         description: "",
         file: null,
@@ -503,8 +521,16 @@ export default function DocumentsPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="doc-project">Proyecto</Label>
                   <Select
-                    value={newDocument.project}
-                    onValueChange={(value) => setNewDocument({ ...newDocument, project: value, url: newDocument.url || "" })}
+                    value={newDocument.workId}
+                    onValueChange={(value) => {
+                      const selectedWork = customerWorks.find(work => work._id === value);
+                      setNewDocument({
+                        ...newDocument,
+                        workId: value,
+                        project: selectedWork?.name || "",
+                        url: newDocument.url || ""
+                      });
+                    }}
                     disabled={!selectedCustomer || isLoadingWorks || customerWorks.length === 0}
                   >
                     <SelectTrigger id="doc-project">
@@ -520,7 +546,7 @@ export default function DocumentsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {customerWorks.map((work) => (
-                        <SelectItem key={work._id} value={work.name}>
+                        <SelectItem key={work._id} value={work._id}>
                           <div className="flex items-center gap-2">
                             <Building className="h-4 w-4" />
                             {work.name}
@@ -592,7 +618,7 @@ export default function DocumentsPage() {
               </Button>
               <Button
                 onClick={() => document.getElementById('file-upload')?.click()}
-                disabled={isUploading || !selectedCustomer || !newDocument.project}
+                disabled={isUploading || !selectedCustomer || !newDocument.workId}
               >
                 {isUploading ? (
                   <>

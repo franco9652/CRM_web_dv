@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ChevronLeft, Loader2, Save, User, Mail, Phone, MapPin, IdCard, X } from "lucide-react"
-import { getCustomersByUserId, updateCustomer, Customer } from "@/services/customers"
+import { ChevronLeft, Loader2, Save, User, Mail, Phone, MapPin, IdCard, X, Trash2 } from "lucide-react"
+import { getCustomersByUserId, updateCustomer, deleteCustomer, Customer } from "@/services/customers"
 import { useToast } from "@/hooks/use-toast"
 
 export default function EditClientPage() {
@@ -16,8 +16,10 @@ export default function EditClientPage() {
   const { toast } = useToast()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   const [customerId, setCustomerId] = useState<string>("")
   const [formData, setFormData] = useState<Partial<Customer>>({
     name: "",
@@ -76,10 +78,10 @@ export default function EditClientPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!params.id) return
-    
+
     setSaving(true)
     try {
-if (!customerId) throw new Error("ID de cliente no válido");
+      if (!customerId) throw new Error("ID de cliente no válido");
       await updateCustomer(customerId, formData)
       toast({
         title: "Cliente actualizado",
@@ -95,6 +97,30 @@ if (!customerId) throw new Error("ID de cliente no válido");
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!customerId) return
+
+    setDeleting(true)
+    try {
+      await deleteCustomer(customerId)
+      toast({
+        title: "Cliente eliminado",
+        description: "El cliente se ha eliminado correctamente."
+      })
+      router.push('/admin/clients')
+    } catch (err: any) {
+      console.error("Error deleting client:", err)
+      toast({
+        title: "Error",
+        description: err?.message || "No se pudo eliminar el cliente",
+        variant: "destructive"
+      })
+    } finally {
+      setDeleting(false)
+      setShowDeleteDialog(false)
     }
   }
 
@@ -232,7 +258,7 @@ if (!customerId) throw new Error("ID de cliente no válido");
                 required
               />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="contactNumber">Teléfono de Contacto</Label>
@@ -295,30 +321,79 @@ if (!customerId) throw new Error("ID de cliente no válido");
           </CardContent>
         </Card>
 
-        <div className="flex justify-end space-x-4">
+        <div className="flex justify-between">
           <Button
             type="button"
-            variant="outline"
-            onClick={() => router.back()}
-            disabled={saving}
+            variant="destructive"
+            onClick={() => setShowDeleteDialog(true)}
+            disabled={saving || deleting}
           >
-            Cancelar
+            <Trash2 className="mr-2 h-4 w-4" />
+            Eliminar Cliente
           </Button>
-          <Button type="submit" disabled={saving}>
-            {saving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Guardar Cambios
-              </>
-            )}
-          </Button>
+          <div className="flex space-x-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={saving || deleting}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={saving || deleting}>
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Guardando...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Guardar Cambios
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </form>
+
+      {/* Diálogo de confirmación de eliminación */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-2">¿Eliminar cliente?</h3>
+            <p className="text-gray-600 mb-6">
+              Esta acción no se puede deshacer. Se eliminará permanentemente el cliente y toda su información asociada.
+            </p>
+            <div className="flex justify-end space-x-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteDialog(false)}
+                disabled={deleting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Eliminar
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -55,7 +55,7 @@ export default function SettingsPage() {
         return;
       }
 
-      const response = await fetch('https://crmdbsoft.zeabur.app/login/change-password', {
+      const response = await fetch('https://crmdbsoft.zeabur.app/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -67,24 +67,24 @@ export default function SettingsPage() {
         })
       });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      alert(data.message || 'Error al cambiar la contraseña');
-      return;
+      if (!response.ok) {
+        alert(data.message || 'Error al cambiar la contraseña');
+        return;
+      }
+      alert('Contraseña actualizada correctamente');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordDialog(false);
+
+    } catch (error) {
+      console.error('Error al cambiar contraseña:', error);
+      alert('Error de conexión. Por favor intenta nuevamente.');
+    } finally {
+      setIsChangingPassword(false);
     }
-    alert('Contraseña actualizada correctamente');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setShowPasswordDialog(false);
-
-  } catch (error) {
-    console.error('Error al cambiar contraseña:', error);
-    alert('Error de conexión. Por favor intenta nuevamente.');
-  } finally {
-    setIsChangingPassword(false);
-  }
   };
 
   const handleWhatsAppClick = () => {
