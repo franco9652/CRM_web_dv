@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ChevronLeft, FileText, Users, Loader2, Upload, Building, User, Download } from "lucide-react"
+import { ChevronLeft, FileText, Users, Loader2, Upload, Building, User, Download, BarChart3 } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 import { getWorkById, getWorksByCustomerId, Work } from "@/services/works"
+import { WorkReportSection } from "@/components/reports/work-report-section"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
@@ -507,6 +508,10 @@ export default function ProjectDetailsPage() {
         <TabsList>
           {/* <TabsTrigger value="team">Equipo</TabsTrigger> */}
           <TabsTrigger value="documents">Documentos</TabsTrigger>
+          <TabsTrigger value="reports">
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Reportes
+          </TabsTrigger>
         </TabsList>
 
         {/* {activeTab === "team" && (
@@ -761,6 +766,18 @@ export default function ProjectDetailsPage() {
                   )
                 }
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === "reports" && (
+          <Card className="mt-4">
+            <CardContent className="pt-6">
+              <WorkReportSection
+                workId={params.id}
+                workName={project?.name || ""}
+                customerEmail={project?.emailCustomer}
+              />
             </CardContent>
           </Card>
         )}

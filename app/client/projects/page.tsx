@@ -120,7 +120,9 @@ export default function ClientProjectsPage() {
 
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return "Sin fecha"
     const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "Fecha inválida"
     return new Intl.DateTimeFormat("es-ES", {
       year: "numeric",
       month: "short",
