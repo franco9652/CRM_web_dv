@@ -168,10 +168,11 @@ export default function CalendarPage() {
 
   // Filter meetings based on search term, customer, and meeting type
   const filteredMeetings = meetings.filter((meeting) => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      meeting.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      meeting.customer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      meeting.project?.title.toLowerCase().includes(searchTerm.toLowerCase());
+      (meeting.title?.toLowerCase() || '').includes(searchLower) ||
+      (meeting.customer?.name?.toLowerCase() || '').includes(searchLower) ||
+      (meeting.project?.title?.toLowerCase() || '').includes(searchLower);
 
     const matchesCustomer = customerFilter === "Todos" || meeting.customer?.name === customerFilter;
     const matchesType = typeFilter === "Todos" || meeting.meetingType === typeFilter;
