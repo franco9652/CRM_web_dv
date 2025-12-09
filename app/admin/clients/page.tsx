@@ -110,9 +110,11 @@ export default function ClientsPage() {
   const filteredClients = useMemo(() =>
     customers.filter(
       (client) =>
-      (client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (client.contactNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (client.email || "").toLowerCase().includes(searchTerm.toLowerCase()))
+      (client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (client?.contactNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (client?.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (client?.secondName?.toLowerCase().includes(searchTerm.toLowerCase()))
+      )
     ),
     [customers, searchTerm]
   )
