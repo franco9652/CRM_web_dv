@@ -24,15 +24,25 @@ export default function ClientProfilePage() {
       setIsLoading(true)
       setError(null)
       try {
-        // 1) Obtener el/los customers asociados al usuario
         const customersRes = await getCustomersByUserId(userId)
         const firstCustomer = customersRes.customer?.[0] || null
 
-        // 2) Si tenemos customer, obtener works por customerId
         let worksRes: Work[] = []
         if (firstCustomer?._id) {
-          const worksByCustomer = await getWorksByCustomerId(firstCustomer._id)
-          worksRes = worksByCustomer?.works || []
+          try {
+            const worksByCustomer = await getWorksByCustomerId(firstCustomer._id)
+            worksRes = worksByCustomer?.works || []
+          } catch (workErr: any) {
+            if (
+              workErr.response?.status === 404 &&
+              (workErr.response?.data?.message === "No works found for this customer" ||
+                workErr.response?.data?.message === "No works found")
+            ) {
+              worksRes = []
+            } else {
+              throw workErr
+            }
+          }
         }
 
         if (!mounted) return

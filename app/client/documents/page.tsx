@@ -128,16 +128,22 @@ export default function ClientDocumentsPage() {
       const data = response.works || [];
       setWorks(data);
     } catch (err: any) {
-      if (err?.status === 400) {
+      if (
+        err.response?.status === 404 &&
+        (err.response?.data?.message === "No works found for this customer" ||
+          err.response?.data?.message === "No works found")
+      ) {
+        setWorks([])
+        setWorksError("")
+        return
+      }
+
+      if (err?.status === 400 || err.response?.status === 400) {
         setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
         toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
-      } else if (err?.status === 404) {
+      } else if (err?.status === 404 || err.response?.status === 404) {
         setWorksError("No se encontraron proyectos")
-        // No mostrar toast de error para el caso específico de "No se encontraron presupuestos para este usuario"
-        // ya que es normal que clientes nuevos no tengan presupuestos aún
-        if (err?.message && !err.message.includes("No works found for this customer")) {
-          toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
-        }
+        toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
       } else {
         setWorksError("Error al cargar los proyectos")
         toast({ title: "Error", description: err?.message || "No se pudieron cargar los trabajos", variant: "destructive" })
@@ -167,11 +173,9 @@ export default function ClientDocumentsPage() {
   }
 
   useEffect(() => {
-    // Only fetch customers initially, works will be fetched when a customer is selected
     fetchData()
   }, [user?.id, user?.role])
 
-  // When customers are loaded, select the first one by default if there's only one
   useEffect(() => {
     if (customers.length === 1 && !selectedCustomerId) {
       setSelectedCustomerId(customers[0]._id);
@@ -181,7 +185,6 @@ export default function ClientDocumentsPage() {
 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>("");
 
-  // Handle customer selection change
   const handleCustomerChange = useCallback((customerId: string) => {
     setSelectedCustomerId(customerId);
     setDocumentWorkId("");
@@ -189,7 +192,6 @@ export default function ClientDocumentsPage() {
     fetchWorks(customerId);
   }, [user?.role]);
 
-  // Memoized handlers
   const handleNameChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setDocumentName(e.target.value);
   }, []);

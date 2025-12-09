@@ -55,7 +55,7 @@ export default function SettingsPage() {
         return;
       }
 
-      const response = await fetch('https://crmdbsoft.zeabur.app/login/change-password', {
+      const response = await fetch('https://crmdbsoft.zeabur.app/change-password', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
