@@ -301,7 +301,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{worksCount}</div>
-              <p className="text-xs text-muted-foreground">{futureProjectsCount} Proyectos activos desde los ultimos 6 meses</p>
+              <p className="text-xs text-muted-foreground">{futureProjectsCount} Proyectos activos</p>
             </CardContent>
           </Card>
           )
