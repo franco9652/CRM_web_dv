@@ -60,9 +60,16 @@ export default function ClientProjectsPage() {
       }
       setWorks(data)
     } catch (err: any) {
-      if(err?.status === 400){
+      console.log('Error fetching works:', err);
+      if (err.response?.status === 404 && err.response?.data?.message === "No works found for this customer") {
+        setWorks([])
+        setWorksError("")
+        return
+      }
+
+      if (err?.status === 400 || err.response?.status === 400) {
         setWorksError(`"Error al cargar los proyectos. ID cliente erroneo"`)
-      } else if (err?.status === 404){
+      } else if (err?.status === 404 || err.response?.status === 404) {
         setWorksError("No se encontraron proyectos")
         setLoadingWorks(false)
       } else {
@@ -90,7 +97,7 @@ export default function ClientProjectsPage() {
     }
   }
 
-  function fetchDatas(){} // eliminar despues es para mergear.
+  function fetchDatas() { } // eliminar despues es para mergear.
 
   useEffect(() => {
     fetchData()
@@ -172,7 +179,7 @@ export default function ClientProjectsPage() {
           fontSize: 14,
           boxShadow: "0 2px 6px rgba(0,0,0,0.08)"
         }}>
-          {isAdmin ? "ADMIN" : user?.role.toLocaleUpperCase()} <span style={{fontWeight:400, fontSize:12}}>({user.role})</span>
+          {isAdmin ? "ADMIN" : user?.role.toLocaleUpperCase()} <span style={{ fontWeight: 400, fontSize: 12 }}>({user.role})</span>
         </span>
       </div>
     )
