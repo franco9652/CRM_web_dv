@@ -60,7 +60,7 @@ export default function AdminDashboard() {
             if (!user.id) throw new Error("ID de cliente no válido")
             const worksResult = await getWorksByCustomerId(user.id)
             // const worksResult = await getWorksByCustomerId("678ac8bbcaa29603b2663cba")
-            data = worksResult as Work[]
+            data = worksResult?.works || []
           } else {
             throw new Error("Rol de usuario no soportado")
           }
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
             if (!user.id) throw new Error("ID de cliente no válido")
             const customersResult = await getCustomersByUserId(user.id)
             // const customersResult = await getCustomersByUserId("678ac8bbcaa29603b2663cba")
-            data = customersResult as Customer[]
+            data = customersResult?.customer || []
           } else {
             throw new Error("Rol de usuario no soportado")
           }
@@ -499,13 +499,13 @@ export default function AdminDashboard() {
                         <span className="text-sm text-muted-foreground flex items-center">
                           <CheckCircle className="mr-1 h-3 w-3 text-green-500" /> Activo
                         </span>
-                        <span className="font-medium">{statusCounts['Activo'] || 0}</span>
+                        <span className="font-medium">{statusCounts['activo'] || 0}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-muted-foreground flex items-center">
                           <PauseCircle className="mr-1 h-3 w-3 text-gray-500" /> Inactivo
                         </span>
-                        <span className="font-medium">{statusCounts['Inactivo'] || 0}</span>
+                        <span className="font-medium">{statusCounts['inactivo'] || 0}</span>
                       </div>
                     </div>
                   </CardContent>
