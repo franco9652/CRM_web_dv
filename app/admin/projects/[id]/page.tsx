@@ -197,6 +197,9 @@ export default function ProjectDetailsPage() {
         variant: 'default',
       })
 
+      // Refrescar datos del proyecto para obtener documentos actualizados
+      await getWorkData()
+
       // Reset form
       setNewDocument({
         name: "",
@@ -263,8 +266,27 @@ export default function ProjectDetailsPage() {
     if (project) {
       const projectDocs = getProjectDocuments(project);
       setAllDocuments(projectDocs);
+      
+      // Pre-seleccionar el cliente y proyecto actual para subir documentos
+      if (project.customerId) {
+        setSelectedCustomer(project.customerId);
+      }
     }
   }, [project])
+
+  // Pre-seleccionar el proyecto actual cuando se cargan los works del cliente
+  useEffect(() => {
+    if (customerWorks.length > 0 && params.id) {
+      const currentProject = customerWorks.find(w => w._id === params.id);
+      if (currentProject) {
+        setNewDocument((prev: any) => ({
+          ...prev,
+          workId: params.id,
+          project: currentProject.name
+        }));
+      }
+    }
+  }, [customerWorks, params.id])
 
   useEffect(() => {
     // Get token from localStorage
