@@ -5,6 +5,8 @@ import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import { loginUser } from "@/services/auth"
+import { getCustomersByUserId } from "@/services/customers"
+import { getAllEmployees } from "@/services/employees"
 
 type User = {
   id: string
@@ -34,6 +36,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
 
+  const deriveNameFromEmail = (email?: string) => {
+    if (!email) return ""
+    const local = email.split("@")[0] || ""
+    return local
+      .split(/[._-]+/g)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ")
+      .trim()
+  }
+
   // Check for stored user and token on initial load
   useEffect(() => {
     const storedUser = localStorage.getItem("user")
@@ -48,7 +61,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (sessionDuration < twoHoursInMs) {
         // La sesión aún es válida
-        setUser(JSON.parse(storedUser))
+        const parsed = JSON.parse(storedUser) as User
+        setUser(parsed)
+
+        const needsNameFix = !!parsed?.email && (parsed?.name === parsed?.email || !parsed?.name)
+        if (needsNameFix) {
+          ;(async () => {
+            let nextName = ""
+
+            if (parsed?.role === "customer") {
+              try {
+                const customersRes = await getCustomersByUserId(parsed?._id || parsed?.id)
+                const c = customersRes?.customer?.[0]
+                if (c) {
+                  nextName = `${(c.name || "").trim()} ${(c.secondName || "").trim()}`.trim()
+                }
+              } catch {}
+            } else {
+              try {
+                const employees = await getAllEmployees()
+                const emp = employees.find((e) => (e.email || "").toLowerCase() === (parsed.email || "").toLowerCase())
+                if (emp?.name) {
+                  nextName = emp.name
+                }
+              } catch {}
+            }
+
+            if (!nextName) {
+              nextName = deriveNameFromEmail(parsed?.email)
+            }
+
+            if (nextName) {
+              const updated = { ...parsed, name: nextName }
+              localStorage.setItem("user", JSON.stringify(updated))
+              setUser(updated)
+            }
+          })()
+        }
       } else {
         // La sesión ha expirado, limpiar datos
         localStorage.removeItem("user")
@@ -118,13 +167,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       localStorage.setItem("token", response.token)
       localStorage.setItem("loginTimestamp", Date.now().toString())
 
+      const role = response.user?.role || response.role
+      const responseEmail = (response.user?.email || email || "").trim()
+      const responseNameRaw = ((response.user as any)?.name || "").trim()
+      const responseLastNameRaw = ((response.user as any)?.secondName || (response.user as any)?.lastName || "").trim()
+
+      const sanitizedName = responseNameRaw && !responseNameRaw.includes("@") ? responseNameRaw : ""
+      let displayName = `${sanitizedName} ${responseLastNameRaw}`.trim()
+      if (!displayName) {
+        displayName = sanitizedName
+      }
+
+      if ((!displayName || displayName === responseEmail) && role === "customer") {
+        try {
+          const customersRes = await getCustomersByUserId(response.user?._id || response._id || response.userId)
+          const c = customersRes?.customer?.[0]
+          if (c) {
+            displayName = `${(c.name || "").trim()} ${(c.secondName || "").trim()}`.trim()
+          }
+        } catch {}
+      }
+
+      if ((!displayName || displayName === responseEmail) && role !== "customer") {
+        try {
+          const employees = await getAllEmployees()
+          const emp = employees.find((e) => (e.email || "").toLowerCase() === responseEmail.toLowerCase())
+          if (emp?.name) {
+            displayName = emp.name
+          }
+        } catch {}
+      }
+
+      if (!displayName || displayName === responseEmail) {
+        displayName = deriveNameFromEmail(responseEmail) || responseEmail
+      }
+
       const userData: User = {
         id: response.userId,
-        name: response.user?.name || email,
-        email: response.user?.email || email,
-        role: response.user?.role || response.role,
+        name: displayName,
+        email: responseEmail,
+        role,
         _id: response.user?._id || response._id,
-        customerId: response.role === "customer" ? response.customerId : undefined
+        customerId: role === "customer" ? response.customerId : undefined,
       }
 
       // Guardar datos del usuario
