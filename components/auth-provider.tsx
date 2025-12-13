@@ -150,9 +150,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push("/admin/dashboard")
       }
 
+      // Si no es admin, no debería acceder a /client/dashboard
+      if (user?.role !== "admin" && pathname.startsWith("/client/dashboard")) {
+        router.push("/client/projects")
+      }
+
       // If logged in as client but trying to access admin routes
-      if (user?.role === "client" && pathname.startsWith("/admin")) {
-        router.push("/client/dashboard")
+      if ((user?.role === "client" || user?.role === "customer") && pathname.startsWith("/admin")) {
+        router.push("/client/projects")
       }
     }
   }, [user, pathname, isLoading, router])

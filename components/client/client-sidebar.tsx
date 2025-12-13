@@ -4,7 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Building2, Calendar, ChevronLeft, ChevronRight, FileBadge, FileText, LayoutDashboard, Settings } from "lucide-react"
+import { Building2, Calendar, ChevronLeft, ChevronRight, FileBadge, FileText } from "lucide-react"
 
 export default function ClientSidebar() {
   const pathname = usePathname()
@@ -18,7 +18,7 @@ export default function ClientSidebar() {
     <div id="client-sidebar" className={`border-r bg-background transition-all duration-300 ${collapsed ? "w-[70px]" : "w-[250px]"}`}>
       <div className="flex flex-col min-h-screen">
         <div className="flex h-14 items-center border-b px-4">
-          <Link href="/client/dashboard" className="flex items-center gap-2 font-semibold">
+          <Link href="/client/projects" className="flex items-center gap-2 font-semibold">
             <Building2 className="h-6 w-6" />
             {!collapsed && <span>BuildTrack</span>}
           </Link>
