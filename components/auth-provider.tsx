@@ -64,7 +64,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const parsed = JSON.parse(storedUser) as User
         setUser(parsed)
 
-        const needsNameFix = !!parsed?.email && (parsed?.name === parsed?.email || !parsed?.name)
+        const emailLocal = (parsed?.email || "").split("@")[0]?.trim().toLowerCase()
+        const currentNameLower = (parsed?.name || "").trim().toLowerCase()
+        const derivedLower = deriveNameFromEmail(parsed?.email).trim().toLowerCase()
+
+        const looksLikeEmailName =
+          (!!emailLocal && currentNameLower === emailLocal) || (!!derivedLower && currentNameLower === derivedLower)
+
+        const needsNameFix = !!parsed?.email && (parsed?.name === parsed?.email || !parsed?.name || looksLikeEmailName)
         if (needsNameFix) {
           ;(async () => {
             let nextName = ""
@@ -80,9 +87,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
               try {
                 const employees = await getAllEmployees()
-                const emp = employees.find((e) => (e.email || "").toLowerCase() === (parsed.email || "").toLowerCase())
+                const emp = employees.find((e) => {
+                  const byUserId = !!(e as any)?.userId && ((e as any).userId === (parsed?._id || parsed?.id))
+                  const byEmail = (e.email || "").toLowerCase() === (parsed.email || "").toLowerCase()
+                  return byUserId || byEmail
+                })
                 if (emp?.name) {
-                  nextName = emp.name
+                  nextName = `${(emp.name || "").trim()} ${((emp as any).lastName || "").trim()}`.trim()
                 }
               } catch {}
             }
@@ -174,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const role = response.user?.role || response.role
       const responseEmail = (response.user?.email || email || "").trim()
+      const responseEmailLocal = (responseEmail.split("@")[0] || "").trim().toLowerCase()
       const responseNameRaw = ((response.user as any)?.name || "").trim()
       const responseLastNameRaw = ((response.user as any)?.secondName || (response.user as any)?.lastName || "").trim()
 
@@ -183,7 +195,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName = sanitizedName
       }
 
-      if ((!displayName || displayName === responseEmail) && role === "customer") {
+      const displayNameLower = (displayName || "").trim().toLowerCase()
+      const looksLikeEmailNameLogin =
+        (!!responseEmailLocal && displayNameLower === responseEmailLocal) ||
+        (!!responseEmailLocal && displayNameLower === deriveNameFromEmail(responseEmail).trim().toLowerCase())
+
+      if ((!displayName || displayName === responseEmail || looksLikeEmailNameLogin) && role === "customer") {
         try {
           const customersRes = await getCustomersByUserId(response.user?._id || response._id || response.userId)
           const c = customersRes?.customer?.[0]
@@ -193,12 +210,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
 
-      if ((!displayName || displayName === responseEmail) && role !== "customer") {
+      if ((!displayName || displayName === responseEmail || looksLikeEmailNameLogin) && role !== "customer") {
         try {
           const employees = await getAllEmployees()
-          const emp = employees.find((e) => (e.email || "").toLowerCase() === responseEmail.toLowerCase())
+          const emp = employees.find((e) => {
+            const byUserId = !!(e as any)?.userId && ((e as any).userId === (response.user?._id || response._id || response.userId))
+            const byEmail = (e.email || "").toLowerCase() === responseEmail.toLowerCase()
+            return byUserId || byEmail
+          })
           if (emp?.name) {
-            displayName = emp.name
+            displayName = `${(emp.name || "").trim()} ${((emp as any).lastName || "").trim()}`.trim()
           }
         } catch {}
       }

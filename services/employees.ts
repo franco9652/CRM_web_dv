@@ -7,6 +7,8 @@ export interface Employee {
   _id: string;
   name: string;
   email: string;
+  lastName?: string;
+  userId?: string;
   phone?: string;
   position?: string;
   department?: string;
