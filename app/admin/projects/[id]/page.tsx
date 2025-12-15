@@ -547,6 +547,32 @@ export default function ProjectDetailsPage() {
                   </div>
                 </dl>
               </div>
+
+              <div>
+                <h3 className="text-sm font-medium mb-2">Empleados asignados</h3>
+                {Array.isArray(project?.employeeInWork) && project!.employeeInWork.length > 0 ? (
+                  <div className="space-y-2">
+                    {project!.employeeInWork
+                      .filter((e: any) => e && (e.name || e.email || e._id))
+                      .map((employee: any) => {
+                        const fullName = `${employee?.name || ''}${employee?.lastName ? ` ${employee.lastName}` : ''}`.trim();
+                        return (
+                          <div key={employee._id || employee.email || fullName} className="flex items-start gap-3 rounded-md border p-3">
+                            <div className="mt-0.5 bg-primary/10 p-2 rounded-full">
+                              <User className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium truncate">{fullName || 'Sin nombre'}</div>
+                              <div className="text-sm text-muted-foreground truncate">{employee?.email || '-'}</div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No hay empleados asignados a este proyecto.</p>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
