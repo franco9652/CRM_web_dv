@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { getCustomersByUserId, type Customer } from "@/services/customers"
+import { getMe, type MeUser } from "@/services/me"
 import { getWorksByCustomerId, type Work } from "@/services/works"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
@@ -13,6 +14,7 @@ export default function ClientProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [customer, setCustomer] = useState<Customer | null>(null)
+  const [employeeProfile, setEmployeeProfile] = useState<MeUser | null>(null)
   const [works, setWorks] = useState<Work[]>([])
 
   const userId = user?._id || user?.id
@@ -20,10 +22,19 @@ export default function ClientProfilePage() {
   useEffect(() => {
     let mounted = true
     const loadData = async () => {
-      if (!userId) return
+      if (!userId || !user) return
       setIsLoading(true)
       setError(null)
       try {
+        if (user.role === "employee") {
+          const meRes = await getMe()
+          if (!mounted) return
+          setEmployeeProfile(meRes?.user || null)
+          setCustomer(null)
+          setWorks([])
+          return
+        }
+
         const customersRes = await getCustomersByUserId(userId)
         const firstCustomer = customersRes.customer?.[0] || null
 
@@ -47,6 +58,7 @@ export default function ClientProfilePage() {
 
         if (!mounted) return
         setCustomer(firstCustomer)
+        setEmployeeProfile(null)
         setWorks(worksRes)
       } catch (err: any) {
         if (!mounted) return
@@ -60,7 +72,7 @@ export default function ClientProfilePage() {
     return () => {
       mounted = false
     }
-  }, [userId])
+  }, [userId, user])
 
   const worksInProgress = useMemo(
     () => works.filter((w) => (w.statusWork || "").toLowerCase().includes("progreso")),
@@ -95,18 +107,20 @@ export default function ClientProfilePage() {
     <div className="grid gap-6 md:grid-cols-3">
       <Card className="md:col-span-1">
         <CardHeader>
-          <CardTitle className="text-xl">Perfil de Cliente</CardTitle>
-          <CardDescription>Información básica de la empresa</CardDescription>
+          <CardTitle className="text-xl">{user?.role === "employee" ? "Perfil de Empleado" : "Perfil de Cliente"}</CardTitle>
+          <CardDescription>
+            {user?.role === "employee" ? "Información básica de tu cuenta" : "Información básica de la empresa"}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
             <div className="text-sm text-muted-foreground">ubicación</div>
-            <div className="font-medium">{customer?.workDirection}</div>
+            <div className="font-medium">{user?.role === "employee" ? "-" : customer?.workDirection}</div>
           </div>
           <Separator />
           <div className="flex items-center gap-2">
             <Mail className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{customer?.email || user?.email || "Sin correo"}</span>
+            <span className="text-sm">{customer?.email || employeeProfile?.email || user?.email || "Sin correo"}</span>
           </div>
           {(customer?.phone || customer?.contactNumber) && (
             <div className="flex items-center gap-2">

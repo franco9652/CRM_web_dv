@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
-import { createWork, CreateWorkInput } from '@/services/works';
+import { createWork, CreateWorkInput, getWorksByCustomerId } from '@/services/works';
 import { getAllCustomers, Customer } from '@/services/customers';
 import { getAllEmployees, Employee } from '@/services/employees';
 import { useToast } from '@/hooks/use-toast';
@@ -66,6 +66,7 @@ export default function CreateWorkForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -133,103 +134,34 @@ export default function CreateWorkForm() {
     }));
   };
 
-  interface UploadResponse {
-    message: string;
-    document: {
-      fileName: string;
-      originalName: string;
-      mimeType: string;
-      size: number;
-      url: string;
-    };
-  }
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || files.length === 0 || !formData.userId) return;
+    if (!files || files.length === 0) return;
 
-    setIsUploading(true);
-    setUploadProgress(0);
+    // En el flujo "Crear Proyecto" todavía no existe workId.
+    // Guardamos los archivos en memoria y los subimos DESPUÉS de crear la obra.
+    setPendingFiles((prev) => [...prev, ...Array.from(files)]);
 
-    try {
-      // Upload each file and collect the URLs
-      const uploadPromises = Array.from(files).map(async (file) => {
-        const uploadData = new FormData();
-        uploadData.append('file', file);
-        if (user?._id) {
-          uploadData.append('userId', user._id.toString());
-        }
+    toast({
+      title: "Archivos listos",
+      description: `Se adjuntaron ${files.length} archivo(s). Se subirán al crear el proyecto.`,
+    });
 
-        if (!token) {
-          throw new Error('No se encontró el token de autenticación');
-        }
-
-        const response = await axios.post<UploadResponse>(
-          `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/${formData.customerId}/upload`,
-          uploadData,
-          {
-            headers: {
-              'Content-Type': 'multipart/form-data',
-              'Authorization': `Bearer ${token}`
-            },
-            onUploadProgress: (progressEvent: any) => { // Using any to bypass type checking
-              if (progressEvent.lengthComputable) {
-                const percentCompleted = Math.round(
-                  (progressEvent.loaded * 100) / progressEvent.total
-                );
-                setUploadProgress(percentCompleted);
-              }
-            },
-          } as any // Type assertion to bypass the type checking for axios config
-        );
-
-        if (response.data?.document?.url) {
-          return response.data.document.url;
-        }
-        throw new Error('No se pudo obtener la URL del archivo subido');
-      });
-
-      const uploadedUrls = await Promise.all(uploadPromises);
-      
-      // Update form data with new document URLs
-      setFormData(prev => ({
-        ...prev,
-        documents: [...(prev.documents || []), ...uploadedUrls]
-      }));
-      
-      toast({
-        title: "¡Éxito!",
-        description: `Se subieron ${uploadedUrls.length} archivo(s) correctamente.`,
-      });
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Hubo un error al subir los archivos. Por favor, inténtalo de nuevo.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
-      // Reset file input
-      if (e.target) e.target.value = '';
-    }
+    if (e.target) e.target.value = '';
   };
 
   const removeDocument = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      documents: prev.documents?.filter((_, i) => i !== index)
-    }));
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleCustomerSelect = (customerId: string) => {
     const selectedCustomer = customers.find(c => c._id === customerId);
     if (selectedCustomer) {
+      const fullName = `${(selectedCustomer.name || '').trim()} ${((selectedCustomer as any).secondName || '').trim()}`.trim()
       setFormData(prev => ({
         ...prev,
         customerId: selectedCustomer._id,
-        customerName: selectedCustomer.name,
+        customerName: fullName || selectedCustomer.name,
         userId: selectedCustomer.userId || '',
         email: selectedCustomer.email || '',
         emailCustomer: selectedCustomer.email || '',
@@ -244,10 +176,94 @@ export default function CreateWorkForm() {
     setError(null);
     setSuccess(false);
 
-    const {...dataToSend } = formData;
+    const dataToSend: any = { ...formData };
+
+    // En el flujo "Crear Proyecto", los documentos se suben luego de crear la obra,
+    // porque el backend necesita workId para asociarlos.
+    delete dataToSend.documents;
+
+    // Evitar enviar strings vacíos que rompen validaciones en backend
+    if (!dataToSend.ID) delete dataToSend.ID;
+    if (!dataToSend.userId) delete dataToSend.userId;
 
     try {
-      await createWork(dataToSend as CreateWorkInput);
+      console.log('[createWork] payload', dataToSend);
+      const created = await createWork(dataToSend as CreateWorkInput);
+      let createdWorkId = created?.workId;
+
+      // Fallback: si producción todavía no devuelve workId, resolverlo buscando la obra recién creada
+      // por customerId + number (preferido) o name.
+      if (!createdWorkId && pendingFiles.length > 0) {
+        try {
+          const worksRes = await getWorksByCustomerId(formData.customerId);
+          const works = worksRes?.works || [];
+          const targetNumber = (formData.number || '').trim();
+          const targetName = (formData.name || '').trim();
+
+          const candidates = works.filter((w: any) => {
+            const byNumber = !!targetNumber && (w?.number || '').trim() === targetNumber;
+            const byName = !!targetName && (w?.name || '').trim() === targetName;
+            return byNumber || byName;
+          });
+
+          // Elegir el candidato con ID autoincremental más alto si existe, si no el último
+          const picked =
+            candidates
+              .slice()
+              .sort((a: any, b: any) => (Number(b?.ID) || 0) - (Number(a?.ID) || 0))[0] ||
+            candidates[candidates.length - 1];
+
+          if (picked?._id) {
+            createdWorkId = picked._id;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      if (pendingFiles.length > 0) {
+        if (!createdWorkId) {
+          throw new Error(
+            "El proyecto se creó, pero no se recibió workId para asociar documentos."
+          );
+        }
+        if (!token) {
+          throw new Error('No se encontró el token de autenticación');
+        }
+
+        setIsUploading(true);
+        setUploadProgress(0);
+
+        const uploadPromises = pendingFiles.map(async (file) => {
+          const uploadData = new FormData();
+          uploadData.append('file', file);
+          uploadData.append('customerId', formData.customerId);
+          uploadData.append('workId', createdWorkId);
+
+          await axios.post(
+            `${process.env.NEXT_PUBLIC_API_URL || 'https://crmdbsoft.zeabur.app'}/api/documents/upload`,
+            uploadData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+                Authorization: `Bearer ${token}`,
+              },
+              onUploadProgress: (progressEvent: any) => {
+                if (progressEvent.lengthComputable) {
+                  const percentCompleted = Math.round(
+                    (progressEvent.loaded * 100) / progressEvent.total
+                  );
+                  setUploadProgress(percentCompleted);
+                }
+              },
+            } as any
+          );
+        });
+
+        await Promise.all(uploadPromises);
+        setPendingFiles([]);
+      }
+
       setSuccess(true);
       toast({
         title: '¡Éxito!',
@@ -289,6 +305,8 @@ export default function CreateWorkForm() {
         variant: 'destructive',
       });
     } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
       setIsSubmitting(false);
     }
   };

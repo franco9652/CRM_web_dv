@@ -115,14 +115,44 @@ export async function getAllWorks(): Promise<Work[]> {
   return allWorks;
 }
 
-export async function createWork(workData: CreateWorkInput): Promise<{ message: string }> {
+export async function createWork(
+  workData: CreateWorkInput
+): Promise<{ message: string; workId?: string }> {
   try {
-    const response = await axios.post<{ message: string }>(`${API_URL}/workCreate`, workData);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const response = await axios.post<{ message: string; workId?: string }>(
+      `${API_URL}/workCreate`,
+      workData,
+      token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : undefined
+    );
     return response.data;
   } catch (error: any) {
-    if (error.response?.data?.error) {
-      throw new Error(error.response.data.error);
+    const data = error?.response?.data;
+    if (data) {
+      const backendError =
+        (typeof data.error === 'string' && data.error.trim() ? data.error.trim() : null) ||
+        (typeof data.message === 'string' && data.message.trim() ? data.message.trim() : null) ||
+        null;
+
+      const backendDetails =
+        (typeof data.details === 'string' && data.details.trim() ? data.details.trim() : null) ||
+        null;
+
+      if (backendError) {
+        throw new Error(backendDetails ? `${backendError}: ${backendDetails}` : backendError);
+      }
     }
+
+    if (error?.message) {
+      throw new Error(error.message);
+    }
+
     throw new Error('Error al conectar con el servidor');
   }
 }
@@ -140,13 +170,33 @@ export interface WorksByCustomerResponse {
 
 export async function getWorksByCustomerId(userId: string): Promise<WorksByCustomerResponse> {
   if (!userId) throw new Error("CustomerId inválido");
-  const res = await axios.get(`${API_URL}/workgetbycustomerid/${userId}`);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const res = await axios.get(
+    `${API_URL}/workgetbycustomerid/${userId}`,
+    token
+      ? {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      : undefined
+  );
   return res.data as WorksByCustomerResponse;
 }
 
 export async function getWorkById(workId: string): Promise<Work | null> {
   if (!workId) throw new Error("WorkId inválido");
-  const res = await axios.get(`${API_URL}/workgetbyid/${workId}`);
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const res = await axios.get(
+    `${API_URL}/workgetbyid/${workId}`,
+    token
+      ? {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      : undefined
+  );
   return res.data as Work;
 }
 

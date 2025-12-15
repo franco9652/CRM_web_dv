@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation"
 import { loginUser } from "@/services/auth"
 import { getCustomersByUserId } from "@/services/customers"
 import { getAllEmployees } from "@/services/employees"
+import { getMe } from "@/services/me"
 
 type User = {
   id: string
@@ -36,6 +37,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
 
+  const decodeJwtPayload = (token?: string): Record<string, any> | null => {
+    try {
+      if (!token) return null
+      const parts = token.split(".")
+      if (parts.length < 2) return null
+      const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/")
+      const padded = base64 + "==".slice(0, (4 - (base64.length % 4)) % 4)
+      const json = decodeURIComponent(
+        atob(padded)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      )
+      return JSON.parse(json)
+    } catch {
+      return null
+    }
+  }
+
   const deriveNameFromEmail = (email?: string) => {
     if (!email) return ""
     const local = email.split("@")[0] || ""
@@ -62,7 +82,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (sessionDuration < twoHoursInMs) {
         // La sesión aún es válida
         const parsed = JSON.parse(storedUser) as User
-        setUser(parsed)
+        const jwtPayload = decodeJwtPayload(token)
+        const jwtName = (jwtPayload?.name || "").toString().trim()
+        const jwtLastName = (jwtPayload?.lastName || jwtPayload?.lastname || jwtPayload?.secondName || "").toString().trim()
+        const jwtDisplayName = `${jwtName} ${jwtLastName}`.trim()
+
+        const parsedWithJwt = jwtDisplayName ? { ...parsed, name: jwtDisplayName } : parsed
+        if (jwtDisplayName && parsed?.name !== jwtDisplayName) {
+          localStorage.setItem("user", JSON.stringify(parsedWithJwt))
+        }
+
+        setUser(parsedWithJwt)
+
+        ;(async () => {
+          try {
+            const me = await getMe(token)
+            const name = (me?.user?.name || "").toString().trim()
+            const lastName = (me?.user?.lastName || "").toString().trim()
+            const meDisplayName = `${name} ${lastName}`.trim()
+            if (meDisplayName) {
+              const updated = {
+                ...parsedWithJwt,
+                name: meDisplayName,
+                customerId: (me?.user as any)?.customerId || parsedWithJwt.customerId,
+              }
+              localStorage.setItem("user", JSON.stringify(updated))
+              setUser(updated)
+            }
+          } catch {
+            // ignore
+          }
+        })()
 
         const emailLocal = (parsed?.email || "").split("@")[0]?.trim().toLowerCase()
         const currentNameLower = (parsed?.name || "").trim().toLowerCase()
@@ -71,14 +121,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const looksLikeEmailName =
           (!!emailLocal && currentNameLower === emailLocal) || (!!derivedLower && currentNameLower === derivedLower)
 
-        const needsNameFix = !!parsed?.email && (parsed?.name === parsed?.email || !parsed?.name || looksLikeEmailName)
+        const needsNameFix =
+          !!parsedWithJwt?.email &&
+          (parsedWithJwt?.name === parsedWithJwt?.email || !parsedWithJwt?.name || looksLikeEmailName)
         if (needsNameFix) {
           ;(async () => {
             let nextName = ""
 
-            if (parsed?.role === "customer") {
+            if (parsedWithJwt?.role === "customer") {
               try {
-                const customersRes = await getCustomersByUserId(parsed?._id || parsed?.id)
+                const customersRes = await getCustomersByUserId(parsedWithJwt?._id || parsedWithJwt?.id)
                 const c = customersRes?.customer?.[0]
                 if (c) {
                   nextName = `${(c.name || "").trim()} ${(c.secondName || "").trim()}`.trim()
@@ -88,22 +140,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               try {
                 const employees = await getAllEmployees()
                 const emp = employees.find((e) => {
-                  const byUserId = !!(e as any)?.userId && ((e as any).userId === (parsed?._id || parsed?.id))
-                  const byEmail = (e.email || "").toLowerCase() === (parsed.email || "").toLowerCase()
+                  const byUserId =
+                    !!(e as any)?.userId && ((e as any).userId === (parsedWithJwt?._id || parsedWithJwt?.id))
+                  const byEmail = (e.email || "").toLowerCase() === (parsedWithJwt.email || "").toLowerCase()
                   return byUserId || byEmail
                 })
                 if (emp?.name) {
-                  nextName = `${(emp.name || "").trim()} ${((emp as any).lastName || "").trim()}`.trim()
+                  const empLast = ((emp as any).lastName || (emp as any).lastname || (emp as any).secondName || "").trim()
+                  nextName = `${(emp.name || "").trim()} ${empLast}`.trim()
                 }
               } catch {}
             }
 
             if (!nextName) {
-              nextName = deriveNameFromEmail(parsed?.email)
+              nextName = deriveNameFromEmail(parsedWithJwt?.email)
             }
 
             if (nextName) {
-              const updated = { ...parsed, name: nextName }
+              const updated = { ...parsedWithJwt, name: nextName }
               localStorage.setItem("user", JSON.stringify(updated))
               setUser(updated)
             }
@@ -161,6 +215,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push("/admin/dashboard")
       }
 
+      if (user?.role === "employee" && pathname.startsWith("/client")) {
+        router.push("/admin/dashboard")
+      }
+
       // Si no es admin, no debería acceder a /client/dashboard
       if (user?.role !== "admin" && pathname.startsWith("/client/dashboard")) {
         router.push("/client/projects")
@@ -187,10 +245,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const responseEmail = (response.user?.email || email || "").trim()
       const responseEmailLocal = (responseEmail.split("@")[0] || "").trim().toLowerCase()
       const responseNameRaw = ((response.user as any)?.name || "").trim()
-      const responseLastNameRaw = ((response.user as any)?.secondName || (response.user as any)?.lastName || "").trim()
+      const responseLastNameRaw = (
+        (response.user as any)?.secondName ||
+        (response.user as any)?.lastName ||
+        (response.user as any)?.lastname ||
+        ""
+      ).trim()
+
+      const jwtPayload = decodeJwtPayload(response.token)
+      const jwtName = (jwtPayload?.name || "").toString().trim()
+      const jwtLastName = (jwtPayload?.lastName || jwtPayload?.lastname || jwtPayload?.secondName || "").toString().trim()
+      const jwtDisplayName = `${jwtName} ${jwtLastName}`.trim()
 
       const sanitizedName = responseNameRaw && !responseNameRaw.includes("@") ? responseNameRaw : ""
-      let displayName = `${sanitizedName} ${responseLastNameRaw}`.trim()
+      let displayName = jwtDisplayName || `${sanitizedName} ${responseLastNameRaw}`.trim()
       if (!displayName) {
         displayName = sanitizedName
       }
@@ -219,13 +287,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return byUserId || byEmail
           })
           if (emp?.name) {
-            displayName = `${(emp.name || "").trim()} ${((emp as any).lastName || "").trim()}`.trim()
+            const empLast = ((emp as any).lastName || (emp as any).lastname || (emp as any).secondName || "").trim()
+            displayName = `${(emp.name || "").trim()} ${empLast}`.trim()
           }
         } catch {}
       }
 
       if (!displayName || displayName === responseEmail) {
         displayName = deriveNameFromEmail(responseEmail) || responseEmail
+      }
+
+      try {
+        const me = await getMe(response.token)
+        const name = (me?.user?.name || "").toString().trim()
+        const lastName = (me?.user?.lastName || "").toString().trim()
+        const meDisplayName = `${name} ${lastName}`.trim()
+        if (meDisplayName) {
+          displayName = meDisplayName
+        }
+      } catch {
+        // ignore
       }
 
       const userData: User = {

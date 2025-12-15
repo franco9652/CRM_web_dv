@@ -58,6 +58,7 @@ type MeetingFormData = Omit<Meeting, '_id' | 'createdAt' | 'updatedAt' | 'date'>
 
 export default function CalendarPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [customers, setCustomers] = useState<Array<{
     _id: string;
@@ -114,7 +115,9 @@ export default function CalendarPage() {
     date: new Date(),
     time: '',
     duration: '',
-    meetingType: 'Presencial',
+    meetingType: 'presencial',
+    meetingLink: '',
+    address: '',
     description: '',
     status: 'scheduled'
   });
@@ -225,9 +228,9 @@ export default function CalendarPage() {
         date: newMeeting.date,
         time: newMeeting.time,
         duration: newMeeting.duration,
-        meetingType: newMeeting.meetingType === "Videollamada" ? "virtual" : "presencial", // Convert to backend values
-        meetingLink: newMeeting.meetingType === "Videollamada" ? newMeeting.meetingLink : undefined,
-        address: newMeeting.meetingType === "Presencial" ? newMeeting.address : undefined,
+        meetingType: newMeeting.meetingType === "virtual" ? "virtual" : "presencial",
+        meetingLink: newMeeting.meetingType === "virtual" ? (newMeeting.meetingLink || '') : undefined,
+        address: newMeeting.meetingType === "presencial" ? (newMeeting.address || '') : undefined,
         description: newMeeting.description,
       };
       
@@ -253,8 +256,6 @@ export default function CalendarPage() {
   }
 
   // Handle editing a meeting
-  const { toast } = useToast();
-
   const handleEditMeeting = async () => {
     if (!selectedMeeting?._id) return;
 
@@ -267,9 +268,9 @@ export default function CalendarPage() {
         date: newMeeting.date,
         time: newMeeting.time,
         duration: newMeeting.duration,
-        meetingType: newMeeting.meetingType === "Videollamada" ? "virtual" : "presencial", // Convert to backend values
-        meetingLink: newMeeting.meetingType === "Videollamada" ? newMeeting.meetingLink : undefined,
-        address: newMeeting.meetingType === "Presencial" ? newMeeting.address : undefined,
+        meetingType: newMeeting.meetingType === "virtual" || newMeeting.meetingType === "Videollamada" ? "virtual" : "presencial",
+        meetingLink: newMeeting.meetingType === "virtual" || newMeeting.meetingType === "Videollamada" ? (newMeeting.meetingLink || '') : undefined,
+        address: newMeeting.meetingType === "presencial" ? (newMeeting.address || '') : undefined,
         description: newMeeting.description,
       };
       
@@ -328,7 +329,9 @@ export default function CalendarPage() {
       date: new Date(),
       time: '',
       duration: '',
-      meetingType: 'Presencial',
+      meetingType: 'presencial',
+      meetingLink: '',
+      address: '',
       description: '',
       status: 'scheduled'
     });
@@ -422,7 +425,7 @@ export default function CalendarPage() {
           date: new Date(meeting.date),
           time: meeting.time || '',
           duration: meeting.duration || '',
-          meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
+          meetingType: meeting.meetingType === 'virtual' || meeting.meetingType === 'Videollamada' ? 'virtual' : 'presencial',
           description: meeting.description || '',
           status: meeting.status || 'scheduled',
           meetingLink: meeting.meetingLink || '',
@@ -460,7 +463,7 @@ export default function CalendarPage() {
           date: new Date(meeting.date),
           time: meeting.time || '',
           duration: meeting.duration || '',
-          meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
+          meetingType: meeting.meetingType === 'virtual' || meeting.meetingType === 'Videollamada' ? 'virtual' : 'presencial',
           description: meeting.description || '',
           status: meeting.status || 'scheduled',
           meetingLink: meeting.meetingLink || '',
@@ -493,7 +496,7 @@ export default function CalendarPage() {
         date: new Date(meeting.date),
         time: meeting.time || '',
         duration: meeting.duration || '',
-        meetingType: meeting.meetingType === 'virtual' ? 'Videollamada' : 'Presencial',
+        meetingType: meeting.meetingType === 'virtual' || meeting.meetingType === 'Videollamada' ? 'virtual' : 'presencial',
         description: meeting.description || '',
         status: meeting.status || 'scheduled',
         meetingLink: meeting.meetingLink || '',
@@ -634,15 +637,15 @@ export default function CalendarPage() {
                   </Select>
                 </div>
               </div>
-              {newMeeting.meetingType === "Presencial" ? (
+              {newMeeting.meetingType === "presencial" ? (
                 <div className="grid gap-2">
                   <Label htmlFor="address">Ubicación</Label>
-                  <Input id="address" placeholder="Ej: Oficina Central, Sala de Juntas" value={newMeeting.address} onChange={(e) => setNewMeeting({ ...newMeeting, address: e.target.value })} />
+                  <Input id="address" placeholder="Ej: Oficina Central, Sala de Juntas" value={newMeeting.address || ''} onChange={(e) => setNewMeeting({ ...newMeeting, address: e.target.value })} />
                 </div>
               ) : (
                 <div className="grid gap-2">
                   <Label htmlFor="meetingLink">Enlace de la Reunión</Label>
-                  <Input id="meetingLink" placeholder="Ej: https://meet.google.com/abc-defg-hij" value={newMeeting.meetingLink} onChange={(e) => setNewMeeting({ ...newMeeting, meetingLink: e.target.value })} />
+                  <Input id="meetingLink" placeholder="Ej: https://meet.google.com/abc-defg-hij" value={newMeeting.meetingLink || ''} onChange={(e) => setNewMeeting({ ...newMeeting, meetingLink: e.target.value })} />
                 </div>
               )}
               <div className="grid gap-2">
@@ -730,11 +733,11 @@ export default function CalendarPage() {
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <div className="flex items-center gap-1">
-                        {meeting.meetingType === "Videollamada" ? <Video className="h-3 w-3 text-muted-foreground" /> : <MapPin className="h-3 w-3 text-muted-foreground" />}
+                        {meeting.meetingType === "virtual" || meeting.meetingType === "Videollamada" ? <Video className="h-3 w-3 text-muted-foreground" /> : <MapPin className="h-3 w-3 text-muted-foreground" />}
                         <span>{meeting.meetingType}</span>
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        {meeting.meetingType === "Videollamada" ? (
+                        {meeting.meetingType === "virtual" || meeting.meetingType === "Videollamada" ? (
                           <div className="flex items-center gap-1">
                             <Link className="h-3 w-3" />
                             <span className="truncate max-w-[150px]">{meeting.meetingLink}</span>
@@ -748,7 +751,7 @@ export default function CalendarPage() {
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Acciones</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => openEditDialog(meeting)}><Edit className="mr-2 h-4 w-4" />Editar Reunión</DropdownMenuItem>
-                          {meeting.meetingType === "Videollamada" && meeting.meetingLink && (
+                          {(meeting.meetingType === "virtual" || meeting.meetingType === "Videollamada") && meeting.meetingLink && (
                             <DropdownMenuItem onClick={() => window.open(meeting.meetingLink, "_blank")}><Video className="mr-2 h-4 w-4" />Unirse a la Reunión</DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -910,21 +913,21 @@ export default function CalendarPage() {
                   <Select value={newMeeting.meetingType} onValueChange={(value) => setNewMeeting({ ...newMeeting, meetingType: value })}>
                     <SelectTrigger id="edit-meetingType"><SelectValue placeholder="Seleccionar tipo" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Videollamada">Videollamada</SelectItem>
-                      <SelectItem value="Presencial">Presencial</SelectItem>
+                      <SelectItem value="virtual">Virtual</SelectItem>
+                      <SelectItem value="presencial">Presencial</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              {newMeeting.meetingType === "Presencial" ? (
+              {newMeeting.meetingType === "presencial" ? (
                 <div className="grid gap-2">
                   <Label htmlFor="edit-address">Ubicación</Label>
-                  <Input id="edit-address" value={newMeeting.address} onChange={(e) => setNewMeeting({ ...newMeeting, address: e.target.value })} />
+                  <Input id="edit-address" value={newMeeting.address || ''} onChange={(e) => setNewMeeting({ ...newMeeting, address: e.target.value })} />
                 </div>
               ) : (
                 <div className="grid gap-2">
                   <Label htmlFor="edit-meetingLink">Enlace de la Reunión</Label>
-                  <Input id="edit-meetingLink" value={newMeeting.meetingLink} onChange={(e) => setNewMeeting({ ...newMeeting, meetingLink: e.target.value })} />
+                  <Input id="edit-meetingLink" value={newMeeting.meetingLink || ''} onChange={(e) => setNewMeeting({ ...newMeeting, meetingLink: e.target.value })} />
                 </div>
               )}
               <div className="grid gap-2">

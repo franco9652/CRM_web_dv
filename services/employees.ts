@@ -8,6 +8,8 @@ export interface Employee {
   name: string;
   email: string;
   lastName?: string;
+  lastname?: string;
+  secondName?: string;
   userId?: string;
   phone?: string;
   position?: string;

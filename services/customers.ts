@@ -53,8 +53,34 @@ export async function getCustomers(page?: number): Promise<CustomersResponse> {
 }
 
 export async function createCustomer(customerData: Omit<Customer, '_id' | 'userId'>): Promise<Customer> {
-  const res = await axios.post(`${API_URL}/customerCreate`, customerData);
-  return res.data as Customer;
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const res = await axios.post(
+      `${API_URL}/customerCreate`,
+      customerData,
+      token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : undefined
+    );
+    return res.data as Customer;
+  } catch (error: any) {
+    const data = error?.response?.data;
+    if (data) {
+      const backendError =
+        (typeof data.error === 'string' && data.error.trim() ? data.error.trim() : null) ||
+        (typeof data.message === 'string' && data.message.trim() ? data.message.trim() : null) ||
+        null;
+      const backendDetails =
+        (typeof data.details === 'string' && data.details.trim() ? data.details.trim() : null) ||
+        null;
+      if (backendError) throw new Error(backendDetails ? `${backendError}: ${backendDetails}` : backendError);
+    }
+    throw new Error(error?.message || 'Error al conectar con el servidor');
+  }
 }
 
 export async function getAllCustomers(): Promise<Customer[]> {
@@ -90,20 +116,96 @@ export async function getAllCustomers(): Promise<Customer[]> {
 export async function getCustomersByUserId(userId?: string): Promise<{ message: string, customer: Customer[] }> {
   if (!userId) throw new Error("userId inválido");
 
-  const { data } = await axios.get<{ message: string, customer: Customer[] }>(`${API_URL}/getcustomersbyid/${userId}`);
-  return data;
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const { data } = await axios.get<{ message: string, customer: Customer[] }>(
+      `${API_URL}/getcustomersbyid/${userId}`,
+      token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : undefined
+    );
+    return data;
+  } catch (error: any) {
+    const data = error?.response?.data;
+    if (data) {
+      const backendError =
+        (typeof data.error === 'string' && data.error.trim() ? data.error.trim() : null) ||
+        (typeof data.message === 'string' && data.message.trim() ? data.message.trim() : null) ||
+        null;
+      const backendDetails =
+        (typeof data.details === 'string' && data.details.trim() ? data.details.trim() : null) ||
+        null;
+      if (backendError) throw new Error(backendDetails ? `${backendError}: ${backendDetails}` : backendError);
+    }
+    throw new Error(error?.message || 'Error al conectar con el servidor');
+  }
 }
 
 export async function updateCustomer(customerId: string, customerData: Partial<Customer>): Promise<Customer> {
   if (!customerId) throw new Error("ID de cliente inválido");
 
-  const { data } = await axios.put<Customer>(`${API_URL}/updateCustomer/${customerId}`, customerData);
-  return data;
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const { data } = await axios.put<Customer>(
+      `${API_URL}/updateCustomer/${customerId}`,
+      customerData,
+      token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : undefined
+    );
+    return data;
+  } catch (error: any) {
+    const data = error?.response?.data;
+    if (data) {
+      const backendError =
+        (typeof data.error === 'string' && data.error.trim() ? data.error.trim() : null) ||
+        (typeof data.message === 'string' && data.message.trim() ? data.message.trim() : null) ||
+        null;
+      const backendDetails =
+        (typeof data.details === 'string' && data.details.trim() ? data.details.trim() : null) ||
+        null;
+      if (backendError) throw new Error(backendDetails ? `${backendError}: ${backendDetails}` : backendError);
+    }
+    throw new Error(error?.message || 'Error al conectar con el servidor');
+  }
 }
 
 export async function deleteCustomer(customerId: string): Promise<{ message: string }> {
   if (!customerId) throw new Error("ID de cliente inválido");
 
-  const { data } = await axios.delete<{ message: string }>(`${API_URL}/deleteCustomer/${customerId}`);
-  return data;
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    const { data } = await axios.delete<{ message: string }>(
+      `${API_URL}/deleteCustomer/${customerId}`,
+      token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : undefined
+    );
+    return data;
+  } catch (error: any) {
+    const data = error?.response?.data;
+    if (data) {
+      const backendError =
+        (typeof data.error === 'string' && data.error.trim() ? data.error.trim() : null) ||
+        (typeof data.message === 'string' && data.message.trim() ? data.message.trim() : null) ||
+        null;
+      const backendDetails =
+        (typeof data.details === 'string' && data.details.trim() ? data.details.trim() : null) ||
+        null;
+      if (backendError) throw new Error(backendDetails ? `${backendError}: ${backendDetails}` : backendError);
+    }
+    throw new Error(error?.message || 'Error al conectar con el servidor');
+  }
 }

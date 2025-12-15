@@ -9,16 +9,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChevronLeft, Loader2, Save, User, Mail, Phone, MapPin, IdCard, X, Trash2 } from "lucide-react"
 import { getCustomersByUserId, updateCustomer, deleteCustomer, Customer } from "@/services/customers"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/components/auth-provider"
 
 export default function EditClientPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
   const { toast } = useToast()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const canDeleteClients = user?.role === "admin"
 
   const [customerId, setCustomerId] = useState<string>("")
   const [formData, setFormData] = useState<Partial<Customer>>({
@@ -83,11 +87,33 @@ export default function EditClientPage() {
     try {
       if (!customerId) throw new Error("ID de cliente no válido");
       await updateCustomer(customerId, formData)
+
+      try {
+        const verifyRes = await getCustomersByUserId(params.id)
+        const updatedClient =
+          verifyRes?.customer?.find((c) => c?._id === customerId) || verifyRes?.customer?.[0] || null
+
+        const desiredWorkDirection = (formData.workDirection || "").toString().trim()
+        const savedWorkDirection = (updatedClient?.workDirection || "").toString().trim()
+
+        if (desiredWorkDirection && desiredWorkDirection !== savedWorkDirection) {
+          toast({
+            title: "Actualizado parcialmente",
+            description: "Se guardó sin errores, pero el cambio en 'Dirección Laboral' no se reflejó al recargar. Revisar backend/endpoint updateCustomer.",
+            variant: "destructive",
+          })
+          return
+        }
+      } catch {
+        // ignore
+      }
+
       toast({
         title: "Cliente actualizado",
         description: "Los datos del cliente se han actualizado correctamente."
       })
       router.push(`/admin/clients/${params.id}`)
+      router.refresh()
     } catch (err: any) {
       console.error("Error updating client:", err)
       toast({
@@ -102,6 +128,16 @@ export default function EditClientPage() {
 
   const handleDelete = async () => {
     if (!customerId) return
+
+    if (!canDeleteClients) {
+      toast({
+        title: "Acción no permitida",
+        description: "No tienes permisos para eliminar clientes.",
+        variant: "destructive",
+      })
+      setShowDeleteDialog(false)
+      return
+    }
 
     setDeleting(true)
     try {
@@ -322,15 +358,19 @@ export default function EditClientPage() {
         </Card>
 
         <div className="flex justify-between">
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={() => setShowDeleteDialog(true)}
-            disabled={saving || deleting}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Eliminar Cliente
-          </Button>
+          {canDeleteClients ? (
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => setShowDeleteDialog(true)}
+              disabled={saving || deleting}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Eliminar Cliente
+            </Button>
+          ) : (
+            <div />
+          )}
           <div className="flex space-x-4">
             <Button
               type="button"
@@ -358,7 +398,7 @@ export default function EditClientPage() {
       </form>
 
       {/* Diálogo de confirmación de eliminación */}
-      {showDeleteDialog && (
+      {canDeleteClients && showDeleteDialog && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-2">¿Eliminar cliente?</h3>

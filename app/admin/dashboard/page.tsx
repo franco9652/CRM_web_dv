@@ -51,11 +51,11 @@ export default function AdminDashboard() {
         setWorksError("")
         try {
           let data: any = []
-          if (user.role === "admin") {
+          if (user.role === "admin" || user.role === "employee") {
             // Obtener todos los proyectos para admin
             const response = await getAllWorks()
             data = response
-          } else if (user.role === "client" || user.role === "customer" || user.role === "employee") {
+          } else if (user.role === "client" || user.role === "customer") {
             // Obtener solo los proyectos del cliente o empleado
             if (!user.id) throw new Error("ID de cliente no válido")
             const worksResult = await getWorksByCustomerId(user.id)
@@ -90,11 +90,11 @@ export default function AdminDashboard() {
         setCustomersError("")
         try {
           let data: any = []
-          if (user.role === "admin") {
+          if (user.role === "admin" || user.role === "employee") {
             // Obtener todos los clientes para admin
             const response = await getAllCustomers()
             data = response
-          } else if (user.role === "client" || user.role === "customer" || user.role === "employee") {
+          } else if (user.role === "client" || user.role === "customer") {
             // Obtener solo los clientes del cliente o empleado
             if (!user.id) throw new Error("ID de cliente no válido")
             const customersResult = await getCustomersByUserId(user.id)
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
         setBudgetsError("")
         try {
           let data: any = []
-          if (user.role === "admin") {
+          if (user.role === "admin" || user.role === "employee") {
             // Obtener todos los presupuestos para admin
             const response = await getAllBudgets()
             data = response

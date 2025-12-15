@@ -269,10 +269,11 @@ export default function ProjectDetailsPage() {
       
       // Pre-seleccionar el cliente y proyecto actual para subir documentos
       if (project.customerId) {
-        setSelectedCustomer(project.customerId);
+        const match = customers.find((c) => c._id === project.customerId) || customers.find((c) => c.userId === project.customerId)
+        setSelectedCustomer(match?._id || project.customerId);
       }
     }
-  }, [project])
+  }, [project, customers])
 
   // Pre-seleccionar el proyecto actual cuando se cargan los works del cliente
   useEffect(() => {
@@ -320,6 +321,10 @@ export default function ProjectDetailsPage() {
 
   useEffect(() => {
     const fetchCustomerWorks = async () => {
+      if (!isUploadDialogOpen) {
+        return
+      }
+
       if (!selectedCustomer) {
         setCustomerWorks([]);
         setNewDocument((prev: any) => ({
@@ -337,9 +342,30 @@ export default function ProjectDetailsPage() {
 
       setIsLoadingWorks(true);
       try {
-        const response = await getWorksByCustomerId(selectedCustomer);
+        const selected = customers.find((c) => c._id === selectedCustomer) || customers.find((c) => c.userId === selectedCustomer)
+        const candidateIds = [
+          selectedCustomer,
+          selected?.userId,
+          selected?._id,
+        ].filter((v, i, arr) => !!v && arr.indexOf(v) === i) as string[]
+
+        let response: any = null
+        let lastErr: any = null
+        for (const candidate of candidateIds) {
+          try {
+            response = await getWorksByCustomerId(candidate)
+            break
+          } catch (err: any) {
+            lastErr = err
+          }
+        }
+
+        if (!response) {
+          throw lastErr
+        }
+
         if (response.works && Array.isArray(response.works)) {
-          setCustomerWorks(response.works.map(work => ({
+          setCustomerWorks(response.works.map((work: Work) => ({
             _id: work._id,
             name: work.name
           })));
@@ -360,7 +386,7 @@ export default function ProjectDetailsPage() {
     };
 
     fetchCustomerWorks();
-  }, [selectedCustomer, toast])
+  }, [selectedCustomer, toast, isUploadDialogOpen, customers])
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString || dateString.trim() === '') {

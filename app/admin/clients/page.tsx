@@ -69,6 +69,8 @@ export default function ClientsPage() {
   const [clientToDelete, setClientToDelete] = useState<Customer | null>(null)
   const [updatingClientId, setUpdatingClientId] = useState<string | null>(null)
 
+  const canDeleteClients = user?.role === "admin"
+
   const fetchCustomers = async () => {
     if (!user?.role) {
       setCustomersError("No se encontró el rol del usuario actual")
@@ -78,7 +80,7 @@ export default function ClientsPage() {
     setCustomersError("")
     try {
       let data: any = []
-      if (user.role === "admin") {
+      if (user.role === "admin" || user.role === "employee") {
         // Obtener todos los clientes para admin
         const response = await getAllCustomers()
         data = response
@@ -272,6 +274,17 @@ export default function ClientsPage() {
   const handleDeleteClient = async () => {
     if (!clientToDelete?._id) return
 
+    if (!canDeleteClients) {
+      toast({
+        title: "Acción no permitida",
+        description: "No tienes permisos para eliminar clientes.",
+        variant: "destructive",
+      })
+      setShowDeleteDialog(false)
+      setClientToDelete(null)
+      return
+    }
+
     setDeletingClientId(clientToDelete._id)
     try {
       await deleteCustomer(clientToDelete._id)
@@ -321,6 +334,14 @@ export default function ClientsPage() {
   }
 
   const openDeleteDialog = (client: Customer) => {
+    if (!canDeleteClients) {
+      toast({
+        title: "Acción no permitida",
+        description: "No tienes permisos para eliminar clientes.",
+        variant: "destructive",
+      })
+      return
+    }
     setClientToDelete(client)
     setShowDeleteDialog(true)
   }
@@ -606,12 +627,14 @@ export default function ClientsPage() {
                               )}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-red-600 focus:text-red-600"
-                              onClick={() => openDeleteDialog(client)}
-                            >
-                              Eliminar Cliente
-                            </DropdownMenuItem>
+                            {canDeleteClients && (
+                              <DropdownMenuItem
+                                className="text-red-600 focus:text-red-600"
+                                onClick={() => openDeleteDialog(client)}
+                              >
+                                Eliminar Cliente
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -684,7 +707,7 @@ export default function ClientsPage() {
       </Card>
 
       {/* Diálogo de confirmación de eliminación */}
-      {showDeleteDialog && clientToDelete && (
+      {canDeleteClients && showDeleteDialog && clientToDelete && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-2">¿Eliminar cliente?</h3>
