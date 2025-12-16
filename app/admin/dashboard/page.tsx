@@ -395,16 +395,16 @@ export default function AdminDashboard() {
           <CardContent className="pt-0">
             <div className="h-[200px]">
               <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
+                <PieChart margin={{ top: 10, right: 10, bottom: 30, left: 10 }}>
                   <Pie
                     data={statusData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={55}
+                    outerRadius={75}
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    labelLine={false}
                   >
                     {statusData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
@@ -414,7 +414,17 @@ export default function AdminDashboard() {
                     formatter={(value) => [`${value} proyectos`, '']}
                     labelFormatter={(label) => `Estado: ${label}`}
                   />
-                  <Legend />
+                  <Legend
+                    verticalAlign="bottom"
+                    align="center"
+                    wrapperStyle={{ fontSize: 12, lineHeight: '16px' }}
+                    formatter={(value: any, entry: any) => {
+                      const total = statusData.reduce((acc, item) => acc + (item.value || 0), 0) || 0
+                      const item = statusData.find((s) => s.name === value)
+                      const pct = total > 0 && item ? Math.round((item.value / total) * 100) : 0
+                      return `${value} ${pct}%`
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

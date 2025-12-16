@@ -50,7 +50,7 @@ export default function CreateWorkForm() {
     startDate: new Date().toISOString().split('T')[0],
     endDate: undefined,
     budget: undefined,
-    employeeInWork: undefined,
+    employeeInWork: [],
     documents: undefined,
     number: undefined,
     email: undefined,
@@ -281,7 +281,7 @@ export default function CreateWorkForm() {
         startDate: new Date().toISOString().split('T')[0],
         endDate: undefined,
         budget: undefined,
-        employeeInWork: undefined,
+        employeeInWork: [],
         documents: undefined,
         number: undefined,
         email: undefined,
@@ -375,7 +375,7 @@ export default function CreateWorkForm() {
                 <Input
                   id="number"
                   name="number"
-                  value={formData.number}
+                  value={formData.number ?? ''}
                   onChange={handleChange}
                   placeholder="Ej: PROJ-2023-001"
                   disabled={isSubmitting}
@@ -497,15 +497,25 @@ export default function CreateWorkForm() {
                         <div 
                           key={employee._id}
                           className="relative flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent cursor-pointer"
-                          onClick={(e) => {
-                            e.preventDefault();
+                          onClick={() => {
                             handleEmployeeSelect(employee._id);
                           }}
                         >
                           <input
                             type="checkbox"
-                            checked={formData?.employeeInWork?.includes(employee._id)}
-                            onChange={() => {}}
+                            checked={!!formData.employeeInWork?.includes(employee._id)}
+                            onPointerDown={(e) => {
+                              // Evita que el Select capture el evento y se cierre
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                              // Evita doble toggle (checkbox + contenedor)
+                              e.stopPropagation();
+                            }}
+                            onChange={() => {
+                              handleEmployeeSelect(employee._id);
+                            }}
                             className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary mr-2"
                           />
                           <div>
@@ -565,7 +575,7 @@ export default function CreateWorkForm() {
                 <Input
                   id="workUbication"
                   name="workUbication"
-                  value={formData.workUbication}
+                  value={formData.workUbication ?? ''}
                   onChange={handleChange}
                   placeholder="Ubicación del proyecto"
                   disabled={isSubmitting}
@@ -582,7 +592,7 @@ export default function CreateWorkForm() {
                 <Input
                   id="address"
                   name="address"
-                  value={formData.address}
+                  value={formData.address ?? ''}
                   onChange={handleChange}
                   placeholder="Dirección del proyecto"
                   disabled={isSubmitting}
@@ -617,7 +627,7 @@ export default function CreateWorkForm() {
                   type="date"
                   id="endDate"
                   name="endDate"
-                  value={formData.endDate}
+                  value={formData.endDate ?? ''}
                   onChange={handleChange}
                   disabled={isSubmitting}
                 />
@@ -634,8 +644,13 @@ export default function CreateWorkForm() {
                   type="number"
                   id="budget"
                   name="budget"
-                  value={formData.budget || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, budget: Number(e.target.value) }))}
+                  value={formData.budget ?? ''}
+                  onChange={(e) =>
+                    setFormData(prev => ({
+                      ...prev,
+                      budget: e.target.value === '' ? undefined : Number(e.target.value),
+                    }))
+                  }
                   placeholder="0.00"
                   step="0.01"
                   min="0"
@@ -654,7 +669,7 @@ export default function CreateWorkForm() {
                   type="email"
                   id="email"
                   name="email"
-                  value={formData.email}
+                  value={formData.email ?? ''}
                   onChange={handleChange}
                   placeholder="email@ejemplo.com"
                   disabled={isSubmitting}
@@ -672,7 +687,7 @@ export default function CreateWorkForm() {
                   type="email"
                   id="emailCustomer"
                   name="emailCustomer"
-                  value={formData.emailCustomer}
+                  value={formData.emailCustomer ?? ''}
                   onChange={handleChange}
                   placeholder="cliente@ejemplo.com"
                   disabled={isSubmitting}
