@@ -213,12 +213,14 @@ export default function AdminDashboard() {
       useEffect(() => {
         if (budgets && budgets?.length > 0) {
           setBudgetsCount(budgets?.length);
-          // Count budgets with createdAt after 2025-02-03
-          const targetDate = new Date('2025-01-03T00:00:00.000Z');
+          const targetDate = new Date();
+          targetDate.setMonth(targetDate.getMonth() - 6);
           const futureBudgetsCount = budgets?.filter(budget => {
-            if (!budget?.createdAt) return false; 
-            const budgetCreatedAt = new Date(budget.createdAt);
-            return budgetCreatedAt > targetDate;
+            const dateValue = (budget as any)?.createdAt || (budget as any)?.budgetDate || (budget as any)?.startDate;
+            if (!dateValue) return true;
+            const parsed = new Date(dateValue);
+            if (Number.isNaN(parsed.getTime())) return true;
+            return parsed >= targetDate;
           }).length;
           setFutureBudgetsCount(futureBudgetsCount);
         }
@@ -342,7 +344,7 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{budgetsCount}</div>
-            <p className="text-xs text-muted-foreground">{futureBudgetsCount} Presupuestos en los ultimos 6 meses</p>
+            <p className="text-xs text-muted-foreground">{futureBudgetsCount} Presupuestos recientes</p>
           </CardContent>
         </Card>
         )}
