@@ -346,23 +346,6 @@ export default function AdminBudgetDetailPage() {
           </CardContent>
         </Card>
 
-        {/* Documentación */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-muted-foreground" />
-              <span>Documentación</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="list-disc pl-5 space-y-1">
-              {budget?.documentation?.map((doc: string, index: number) => (
-                <li key={index} className="capitalize">{doc}</li>
-              ))}
-              {budget?.documentation?.length === 0 && <li className="text-muted-foreground">No hay documentación adjunta</li>}
-            </ul>
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +36,14 @@ export default function ClientHeader() {
       </div>
 
       <div className="flex items-center gap-2">
+        {user?.role === "customer" && (
+          <Badge
+            variant="secondary"
+            className="hidden sm:inline-flex bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+          >
+            CUSTOMER
+          </Badge>
+        )}
         <Button variant="ghost" size="icon" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
           <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
@@ -52,8 +61,22 @@ export default function ClientHeader() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>
-              <div>{user?.contactName || user?.name}</div>
-              {user?.role === "client" && <div className="text-xs font-normal text-muted-foreground">{user?.name}</div>}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate">{user?.contactName || user?.name}</div>
+                  {user?.role === "client" && (
+                    <div className="text-xs font-normal text-muted-foreground truncate">{user?.name}</div>
+                  )}
+                </div>
+                {user?.role === "customer" && (
+                  <Badge
+                    variant="secondary"
+                    className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 whitespace-nowrap"
+                  >
+                    CUSTOMER
+                  </Badge>
+                )}
+              </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
              <DropdownMenuItem onClick={() => router.push("/client/profile")}>Perfil de Empresa</DropdownMenuItem>

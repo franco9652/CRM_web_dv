@@ -722,7 +722,7 @@ export default function CreateWorkForm() {
                         {isUploading ? 'Subiendo...' : 'Seleccionar archivos'}
                       </label>
                       <span className="text-sm text-muted-foreground">
-                        {formData.documents?.length || 0} archivo(s) adjunto(s)
+                        {(pendingFiles.length + (formData.documents?.length || 0))} archivo(s) adjunto(s)
                       </span>
                     </div>
 
@@ -738,6 +738,47 @@ export default function CreateWorkForm() {
                     )}
 
                     {/* Document List */}
+                    {pendingFiles.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <h4 className="text-sm font-medium">Archivos adjuntos:</h4>
+                        <div className="space-y-2">
+                          {pendingFiles.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between p-2 text-sm border rounded">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                <span className="truncate max-w-[200px]">{file.name}</span>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6"
+                                onClick={() => removeDocument(index)}
+                                disabled={isSubmitting}
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="16"
+                                  height="16"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="h-3 w-3 text-muted-foreground"
+                                >
+                                  <path d="M18 6 6 18" />
+                                  <path d="m6 6 12 12" />
+                                </svg>
+                                <span className="sr-only">Eliminar</span>
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {formData.documents && formData.documents.length > 0 && (
                       <div className="mt-4 space-y-2">
                         <h4 className="text-sm font-medium">Documentos adjuntos:</h4>

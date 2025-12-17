@@ -164,25 +164,7 @@ export default function ClientProjectsPage() {
 
   // Flag visual del rol del usuario
   const renderUserRoleFlag = () => {
-    if (!user?.role) return null
-    const roleLower = user?.role.toLowerCase()
-    // console.log('user.role = ', user.role)
-    const isAdmin = roleLower === "admin"
-    return (
-      <div style={{ position: "absolute", top: 16, right: 16, zIndex: 1000 }}>
-        <span style={{
-          background: isAdmin ? "#0070f3" : "#22c55e",
-          color: "white",
-          padding: "4px 12px",
-          borderRadius: 8,
-          fontWeight: 600,
-          fontSize: 14,
-          boxShadow: "0 2px 6px rgba(0,0,0,0.08)"
-        }}>
-          {isAdmin ? "ADMIN" : user?.role.toLocaleUpperCase()} <span style={{ fontWeight: 400, fontSize: 12 }}>({user.role})</span>
-        </span>
-      </div>
-    )
+    return null
   }
 
   return (
